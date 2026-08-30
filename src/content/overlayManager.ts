@@ -101,6 +101,20 @@ export class OverlayManager {
         node.nodeValue = withWs;
       }
 
+      // Synchronize parent element's title/aria-label if present
+      const parentEl = node.parentElement;
+      if (parentEl) {
+        const pTitle = parentEl.getAttribute('title');
+        const cleanOrig = origVal.trim();
+        if (pTitle && (pTitle === cleanOrig || cleanOrig.length > 3 && pTitle.includes(cleanOrig))) {
+          parentEl.setAttribute('title', translatedText);
+        }
+        const pAria = parentEl.getAttribute('aria-label');
+        if (pAria && (pAria === cleanOrig || cleanOrig.length > 3 && pAria.includes(cleanOrig))) {
+          parentEl.setAttribute('aria-label', translatedText);
+        }
+      }
+
       state.injectedValue = withWs;
       state.translation = translatedText;
       state.applied = true;

@@ -4,23 +4,14 @@ import { logger } from '../utils/logger';
 
 type EnqueueCallback = (targets: TextExtractTarget[], priority: 0 | 1 | 2) => void;
 
-const CHUNK_SIZE = 50; // elements processed per async tick
-
 /**
- * Chunked, priority-aware DOM scanner.
+ * Fast, Priority-Aware DOM Scanner.
  *
- * Rather than walking the entire document synchronously (which blocks the
- * page), the scanner processes elements in small chunks using
- * requestIdleCallback (with setTimeout fallback) so the browser remains
- * responsive throughout.
- *
- * Priority ordering:
- *   P0 – elements currently in the visible viewport (translate first)
- *   P1 – elements within the next 2 viewport heights (translate in background)
- *   P2 – everything else (translate during idle time)
- *
- * This ensures the user sees translations immediately without needing to
- * scroll, while offscreen content is translated continuously in the background.
+ * Uses a single comprehensive TreeWalker pass to extract all translatable
+ * targets and attributes across the subtree, then partitions them into:
+ *   P0 – visible viewport targets (highest priority, translated immediately)
+ *   P1 – near-viewport targets (within 2.5x viewport height)
+ *   P2 – deep/footer targets
  */
 export class ScannerWorker {
   private readonly extractor: TextExtractor;
@@ -43,112 +34,62 @@ export class ScannerWorker {
     this.settings = settings;
   }
 
-  /** Abort any current in-progress scan (called on SPA navigation) */
   abort() {
     this.scanAbortFlag = true;
   }
 
-  /**
-   * Full prioritized scan of a root element.
-   *
-   * Step 1: Immediately collect and translate P0 (visible viewport) using a
-   *         fast, synchronous mini-scan of only what's currently visible.
-   *
-   * Step 2: Walk the remaining DOM asynchronously in CHUNK_SIZE chunks,
-   *         classifying each element as P1 or P2 and enqueueing accordingly.
-   */
   async scan(root: Element) {
     this.scanAbortFlag = false;
 
-    // ── P0: Immediate viewport scan (synchronous, very fast) ──────────────
+    // Single comprehensive extraction pass across root
+    const allTargets = this.extractor.extractFromRoot(root, this.settings);
+    if (allTargets.length === 0) return;
+
     const viewportH = window.innerHeight;
-    const p0Targets = this.extractViewportTargets(root, viewportH);
-    if (p0Targets.length > 0) {
-      this.enqueue(p0Targets, 0);
-      logger.debug(`P0 (viewport): ${p0Targets.length} targets enqueued immediately`);
-    }
+    const nearLimit = viewportH * 2.5;
 
-    // ── P1 + P2: Background chunked scan ────────────────────────────────
-    const allElements = Array.from(root.querySelectorAll<HTMLElement>('*'));
-    const nearLimit = viewportH * 3; // P1 threshold: 3× viewport height from top
-    let i = 0;
+    const p0: TextExtractTarget[] = [];
+    const p1: TextExtractTarget[] = [];
+    const p2: TextExtractTarget[] = [];
 
-    const processChunk = () => {
-      if (this.scanAbortFlag || i >= allElements.length) return;
+    for (const target of allTargets) {
+      if (this.scanAbortFlag) return;
+      const roughTop = target.element ? getOffsetTop(target.element) : 0;
 
-      const chunkEnd = Math.min(i + CHUNK_SIZE, allElements.length);
-      const p1: TextExtractTarget[] = [];
-      const p2: TextExtractTarget[] = [];
-
-      for (; i < chunkEnd; i++) {
-        const el = allElements[i];
-        const roughTop = getOffsetTop(el);
-
-        const targets = this.extractor.extractFromRoot(el, this.settings);
-        if (targets.length === 0) continue;
-
-        if (roughTop < nearLimit) {
-          p1.push(...targets);
-        } else {
-          p2.push(...targets);
-        }
-      }
-
-      if (p1.length > 0) this.enqueue(p1, 1);
-      if (p2.length > 0) this.enqueue(p2, 2);
-
-      // Schedule next chunk
-      scheduleIdle(processChunk);
-    };
-
-    // Give P0 translations a head-start before background scan begins
-    scheduleIdle(processChunk);
-  }
-
-  /**
-   * Fast synchronous scan of visible-viewport elements.
-   */
-  private extractViewportTargets(root: Element, viewportH: number): TextExtractTarget[] {
-    const targets: TextExtractTarget[] = [];
-
-    // Collect candidate elements that are visually in or near the viewport
-    const candidates = root.querySelectorAll<HTMLElement>('*');
-    const limit = Math.min(candidates.length, 800); // scan first 800 elements without premature break
-
-    for (let i = 0; i < limit; i++) {
-      const el = candidates[i];
-      const top = getOffsetTop(el);
-      if (top > viewportH * 1.5) continue; // Skip elements far below, but do NOT break early
-
-      const extracted = this.extractor.extractFromRoot(el, this.settings);
-      for (const t of extracted) {
-        t.priority = 0;
-        targets.push(t);
+      if (roughTop <= viewportH * 1.2) {
+        target.priority = 0;
+        p0.push(target);
+      } else if (roughTop <= nearLimit) {
+        target.priority = 1;
+        p1.push(target);
+      } else {
+        target.priority = 2;
+        p2.push(target);
       }
     }
 
-    return targets;
+    if (p0.length > 0) {
+      logger.debug(`Scanner: Enqueueing ${p0.length} P0 targets`);
+      this.enqueue(p0, 0);
+    }
+    if (p1.length > 0) {
+      logger.debug(`Scanner: Enqueueing ${p1.length} P1 targets`);
+      this.enqueue(p1, 1);
+    }
+    if (p2.length > 0) {
+      logger.debug(`Scanner: Enqueueing ${p2.length} P2 targets`);
+      this.enqueue(p2, 2);
+    }
   }
 }
 
-// ── Helpers ────────────────────────────────────────────────────────────────
-
-/** Cheap element position estimate without forcing a layout reflow */
+/** Cheap element position estimate without forcing layout thrashing */
 function getOffsetTop(el: HTMLElement): number {
   let top = 0;
   let node: HTMLElement | null = el;
-  while (node) {
+  while (node && node !== document.body) {
     top += node.offsetTop || 0;
     node = node.offsetParent as HTMLElement | null;
   }
   return top;
-}
-
-/** requestIdleCallback with setTimeout fallback for environments that lack it */
-function scheduleIdle(fn: () => void) {
-  if (typeof requestIdleCallback !== 'undefined') {
-    requestIdleCallback(fn, { timeout: 500 });
-  } else {
-    setTimeout(fn, 0);
-  }
 }

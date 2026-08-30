@@ -177,7 +177,14 @@ class ContentTranslator {
       '.channel-items__right',
       '.channel-link',
       'header',
-      '#bili-header-container'
+      '#bili-header-container',
+      '.up-info',
+      '.up-detail',
+      '.video-toolbar-v1',
+      '.tag-panel',
+      '.bpx-player-control-bottom',
+      '.bili-elevator',
+      '.side-nav',
     ];
 
     for (const sel of prioritySelectors) {
@@ -186,16 +193,6 @@ class ContentTranslator {
         const extracted = this.textExtractor.extractFromRoot(el, this.settings);
         for (const t of extracted) { t.priority = 0; targets.push(t); }
       });
-    }
-
-    // 2. Scan the first ~400 general elements across the top
-    const candidates = root.querySelectorAll<HTMLElement>('*');
-    const limit = Math.min(candidates.length, 400);
-
-    for (let i = 0; i < limit; i++) {
-      const el = candidates[i];
-      const extracted = this.textExtractor.extractFromRoot(el, this.settings);
-      for (const t of extracted) { t.priority = 0; targets.push(t); }
     }
 
     if (targets.length > 0) {

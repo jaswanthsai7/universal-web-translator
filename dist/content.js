@@ -352,6 +352,18 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
         if (node.nodeValue !== withWs) {
           node.nodeValue = withWs;
         }
+        const parentEl = node.parentElement;
+        if (parentEl) {
+          const pTitle = parentEl.getAttribute("title");
+          const cleanOrig = origVal.trim();
+          if (pTitle && (pTitle === cleanOrig || cleanOrig.length > 3 && pTitle.includes(cleanOrig))) {
+            parentEl.setAttribute("title", translatedText);
+          }
+          const pAria = parentEl.getAttribute("aria-label");
+          if (pAria && (pAria === cleanOrig || cleanOrig.length > 3 && pAria.includes(cleanOrig))) {
+            parentEl.setAttribute("aria-label", translatedText);
+          }
+        }
         state.injectedValue = withWs;
         state.translation = translatedText;
         state.applied = true;
@@ -904,7 +916,6 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
   function delay(ms) {
     return new Promise((r) => setTimeout(r, ms));
   }
-  const CHUNK_SIZE = 50;
   class ScannerWorker {
     constructor(extractor, settings, enqueue) {
       __publicField(this, "extractor");
@@ -918,87 +929,54 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
     updateSettings(settings) {
       this.settings = settings;
     }
-    /** Abort any current in-progress scan (called on SPA navigation) */
     abort() {
       this.scanAbortFlag = true;
     }
-    /**
-     * Full prioritized scan of a root element.
-     *
-     * Step 1: Immediately collect and translate P0 (visible viewport) using a
-     *         fast, synchronous mini-scan of only what's currently visible.
-     *
-     * Step 2: Walk the remaining DOM asynchronously in CHUNK_SIZE chunks,
-     *         classifying each element as P1 or P2 and enqueueing accordingly.
-     */
     async scan(root) {
       this.scanAbortFlag = false;
+      const allTargets = this.extractor.extractFromRoot(root, this.settings);
+      if (allTargets.length === 0) return;
       const viewportH = window.innerHeight;
-      const p0Targets = this.extractViewportTargets(root, viewportH);
-      if (p0Targets.length > 0) {
-        this.enqueue(p0Targets, 0);
-        logger.debug(`P0 (viewport): ${p0Targets.length} targets enqueued immediately`);
-      }
-      const allElements = Array.from(root.querySelectorAll("*"));
-      const nearLimit = viewportH * 3;
-      let i = 0;
-      const processChunk = () => {
-        if (this.scanAbortFlag || i >= allElements.length) return;
-        const chunkEnd = Math.min(i + CHUNK_SIZE, allElements.length);
-        const p1 = [];
-        const p2 = [];
-        for (; i < chunkEnd; i++) {
-          const el = allElements[i];
-          const roughTop = getOffsetTop(el);
-          const targets = this.extractor.extractFromRoot(el, this.settings);
-          if (targets.length === 0) continue;
-          if (roughTop < nearLimit) {
-            p1.push(...targets);
-          } else {
-            p2.push(...targets);
-          }
-        }
-        if (p1.length > 0) this.enqueue(p1, 1);
-        if (p2.length > 0) this.enqueue(p2, 2);
-        scheduleIdle(processChunk);
-      };
-      scheduleIdle(processChunk);
-    }
-    /**
-     * Fast synchronous scan of visible-viewport elements.
-     */
-    extractViewportTargets(root, viewportH) {
-      const targets = [];
-      const candidates = root.querySelectorAll("*");
-      const limit = Math.min(candidates.length, 800);
-      for (let i = 0; i < limit; i++) {
-        const el = candidates[i];
-        const top = getOffsetTop(el);
-        if (top > viewportH * 1.5) continue;
-        const extracted = this.extractor.extractFromRoot(el, this.settings);
-        for (const t of extracted) {
-          t.priority = 0;
-          targets.push(t);
+      const nearLimit = viewportH * 2.5;
+      const p0 = [];
+      const p1 = [];
+      const p2 = [];
+      for (const target of allTargets) {
+        if (this.scanAbortFlag) return;
+        const roughTop = target.element ? getOffsetTop(target.element) : 0;
+        if (roughTop <= viewportH * 1.2) {
+          target.priority = 0;
+          p0.push(target);
+        } else if (roughTop <= nearLimit) {
+          target.priority = 1;
+          p1.push(target);
+        } else {
+          target.priority = 2;
+          p2.push(target);
         }
       }
-      return targets;
+      if (p0.length > 0) {
+        logger.debug(`Scanner: Enqueueing ${p0.length} P0 targets`);
+        this.enqueue(p0, 0);
+      }
+      if (p1.length > 0) {
+        logger.debug(`Scanner: Enqueueing ${p1.length} P1 targets`);
+        this.enqueue(p1, 1);
+      }
+      if (p2.length > 0) {
+        logger.debug(`Scanner: Enqueueing ${p2.length} P2 targets`);
+        this.enqueue(p2, 2);
+      }
     }
   }
   function getOffsetTop(el) {
     let top = 0;
     let node = el;
-    while (node) {
+    while (node && node !== document.body) {
       top += node.offsetTop || 0;
       node = node.offsetParent;
     }
     return top;
-  }
-  function scheduleIdle(fn) {
-    if (typeof requestIdleCallback !== "undefined") {
-      requestIdleCallback(fn, { timeout: 500 });
-    } else {
-      setTimeout(fn, 0);
-    }
   }
   class FloatingHUD {
     constructor(settings, callbacks) {
@@ -2491,7 +2469,14 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
         ".channel-items__right",
         ".channel-link",
         "header",
-        "#bili-header-container"
+        "#bili-header-container",
+        ".up-info",
+        ".up-detail",
+        ".video-toolbar-v1",
+        ".tag-panel",
+        ".bpx-player-control-bottom",
+        ".bili-elevator",
+        ".side-nav"
       ];
       for (const sel of prioritySelectors) {
         const els = root.querySelectorAll(sel);
@@ -2502,16 +2487,6 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
             targets.push(t);
           }
         });
-      }
-      const candidates = root.querySelectorAll("*");
-      const limit = Math.min(candidates.length, 400);
-      for (let i = 0; i < limit; i++) {
-        const el = candidates[i];
-        const extracted = this.textExtractor.extractFromRoot(el, this.settings);
-        for (const t of extracted) {
-          t.priority = 0;
-          targets.push(t);
-        }
       }
       if (targets.length > 0) {
         logger.info(`Immediate viewport scan: ${targets.length} targets discovered`);
