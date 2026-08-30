@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Universal Web Translator - Options</title>
+  <script type="module" crossorigin src="./assets/index-BXXDh70T.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-CyHyhJRj.css">
+</head>
+<body>
+  <div class="options-layout">
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <span class="logo">🌐</span>
+        <h2>Translator Settings</h2>
+      </div>
+      <nav class="nav-links">
+        <a href="#section-providers" class="nav-item active">Translation Engines</a>
+        <a href="#section-custom-api" class="nav-item">Custom AI / LLM</a>
+        <a href="#section-appearance" class="nav-item">Appearance & Overlay</a>
+        <a href="#section-sites" class="nav-item">Domain Management</a>
+      </nav>
+    </aside>
+
+    <main class="content">
+      <header class="content-header">
+        <h1>Preferences & Engine Configuration</h1>
+        <p>Configure custom translation providers, non-destructive overlay styles, and dynamic page rules.</p>
+      </header>
+
+      <!-- Section: Translation Engines & Fallback -->
+      <section id="section-providers" class="card">
+        <h2>Engine Hierarchy & Fallback Chain</h2>
+        <p class="card-desc">If the primary provider faces rate limits or network issues, the fallback providers are automatically tried without disrupting the user.</p>
+
+        <div class="form-grid">
+          <div class="field">
+            <label for="primary-provider">Primary Engine</label>
+            <select id="primary-provider" class="input">
+              <option value="google">Google Web (Free / High Reliability)</option>
+              <option value="libretranslate">LibreTranslate (Open Source)</option>
+              <option value="mymemory">MyMemory (Free Public)</option>
+              <option value="custom">Custom AI / LLM API</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="fallback-1">Fallback Engine 1</label>
+            <select id="fallback-1" class="input">
+              <option value="libretranslate">LibreTranslate (Open Source)</option>
+              <option value="google">Google Web</option>
+              <option value="mymemory">MyMemory</option>
+              <option value="none">None</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="fallback-2">Fallback Engine 2</label>
+            <select id="fallback-2" class="input">
+              <option value="mymemory">MyMemory (Free Public)</option>
+              <option value="google">Google Web</option>
+              <option value="libretranslate">LibreTranslate</option>
+              <option value="none">None</option>
+            </select>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section: Custom AI / LLM -->
+      <section id="section-custom-api" class="card">
+        <h2>Custom API / Local LLM (Ollama, OpenAI, DeepSeek)</h2>
+        <p class="card-desc">Connect your own OpenAI-compatible endpoint or local Ollama instance for translations.</p>
+
+        <div class="form-stack">
+          <div class="field">
+            <label for="custom-api-url">API Endpoint URL</label>
+            <input type="url" id="custom-api-url" class="input" placeholder="https://api.openai.com/v1/chat/completions or http://localhost:11434/v1/chat/completions">
+            <span class="help-text">Compatible with OpenAI, Ollama, Groq, DeepSeek, and LocalAI.</span>
+          </div>
+
+          <div class="field">
+            <label for="custom-api-key">API Key (Bearer Token)</label>
+            <input type="password" id="custom-api-key" class="input" placeholder="sk-...">
+            <span class="help-text">Stored securely in local browser storage. Leave empty for local Ollama.</span>
+          </div>
+
+          <div class="field">
+            <label for="custom-api-model">Model Name</label>
+            <input type="text" id="custom-api-model" class="input" placeholder="gpt-4o-mini or llama3:8b">
+          </div>
+        </div>
+      </section>
+
+      <!-- Section: Appearance -->
+      <section id="section-appearance" class="card">
+        <h2>Visual Layer & Overlay Appearance</h2>
+        <p class="card-desc">Customize how translations appear above original text on dynamic pages.</p>
+
+        <div class="form-grid">
+          <div class="field">
+            <label for="font-size">Font Size (<span id="font-size-val">13</span>px)</label>
+            <input type="range" id="font-size" min="10" max="18" value="13" class="slider-input">
+          </div>
+
+          <div class="field">
+            <label for="opacity">Overlay Opacity (<span id="opacity-val">95</span>%)</label>
+            <input type="range" id="opacity" min="40" max="100" value="95" class="slider-input">
+          </div>
+
+          <div class="field">
+            <label for="theme-select">Visual Theme</label>
+            <select id="theme-select" class="input">
+              <option value="glass-dark">Glassmorphism Dark (Recommended)</option>
+              <option value="glass-light">Glassmorphism Light</option>
+              <option value="subtle">Subtle Minimal</option>
+              <option value="vibrant">High Contrast Vibrant</option>
+            </select>
+          </div>
+
+          <div class="field checkbox-field">
+            <label class="toggle-control">
+              <input type="checkbox" id="show-hud" checked>
+              <span>Show On-Page Floating Control HUD</span>
+            </label>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section: Per-site Domains -->
+      <section id="section-sites" class="card">
+        <h2>Domain Settings</h2>
+        <p class="card-desc">Enable or disable translation on specific domains.</p>
+        <div id="site-rules-container" class="site-rules-list">
+          <p class="empty-text">No custom domain overrides set. Translation is active on all supported sites.</p>
+        </div>
+      </section>
+
+      <!-- Action Footer -->
+      <div class="actions-bar">
+        <button id="btn-save" class="btn btn-save">Save Settings</button>
+        <span id="save-status" class="save-status"></span>
+      </div>
+    </main>
+  </div>
+
+</body>
+</html>

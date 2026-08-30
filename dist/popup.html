@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Universal Web Translator</title>
+  <script type="module" crossorigin src="./assets/index-BhNK4jO8.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-CruV9awe.css">
+</head>
+<body>
+  <div class="popup-container">
+    <!-- Header -->
+    <header class="header">
+      <div class="brand">
+        <span class="brand-icon">🌐</span>
+        <div>
+          <h1 class="brand-title">Web Translator</h1>
+          <p class="brand-subtitle">Non-destructive Dynamic Translation</p>
+        </div>
+      </div>
+      <div class="header-toggle">
+        <label class="switch" title="Toggle translation on/off">
+          <input type="checkbox" id="global-toggle" checked>
+          <span class="slider"></span>
+        </label>
+      </div>
+    </header>
+
+    <!-- Domain Specific Bar -->
+    <div class="site-bar">
+      <div class="site-info">
+        <span class="site-label">Site:</span>
+        <span id="current-domain" class="site-domain">current-site.com</span>
+      </div>
+      <label class="checkbox-label">
+        <input type="checkbox" id="site-toggle" checked>
+        <span>Enabled</span>
+      </label>
+    </div>
+
+    <!-- Language Selector -->
+    <div class="section language-section">
+      <div class="lang-row">
+        <div class="lang-field">
+          <label for="source-lang">From</label>
+          <select id="source-lang" class="select-input">
+            <option value="auto">Auto Detect</option>
+            <option value="zh">Chinese (中文)</option>
+            <option value="ja">Japanese (日本語)</option>
+            <option value="ko">Korean (한국어)</option>
+            <option value="en">English</option>
+            <option value="es">Spanish</option>
+            <option value="fr">French</option>
+            <option value="de">German</option>
+            <option value="ru">Russian</option>
+          </select>
+        </div>
+
+        <div class="swap-icon" title="Target Language">➔</div>
+
+        <div class="lang-field">
+          <label for="target-lang">To</label>
+          <select id="target-lang" class="select-input">
+            <option value="en" selected>English</option>
+            <option value="zh">Chinese (中文)</option>
+            <option value="ja">Japanese (日本語)</option>
+            <option value="ko">Korean (한국어)</option>
+            <option value="es">Spanish</option>
+            <option value="fr">French</option>
+            <option value="de">German</option>
+            <option value="ru">Russian</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Engine & Mode -->
+    <div class="section config-section">
+      <div class="form-group">
+        <label for="provider-select">Translation Engine</label>
+        <select id="provider-select" class="select-input">
+          <option value="google">Google Web (Free / Auto-Detect)</option>
+          <option value="libretranslate">LibreTranslate (Open Source)</option>
+          <option value="mymemory">MyMemory (Free Public)</option>
+          <option value="custom">Custom AI / OpenAI / Ollama</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Translation Mode</label>
+        <div class="segmented-control">
+          <button type="button" class="segment-btn active" data-mode="translated-only" id="mode-translated-only">
+            ✨ Translated Only
+          </button>
+          <button type="button" class="segment-btn" data-mode="dual" id="mode-dual">
+            📝 Dual
+          </button>
+          <button type="button" class="segment-btn" data-mode="hover" id="mode-hover">
+            🔍 Hover
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Dynamic Options Toggles -->
+    <div class="section options-section">
+      <h3 class="section-title">Dynamic Website Features</h3>
+      
+      <label class="feature-toggle">
+        <input type="checkbox" id="toggle-dynamic" checked>
+        <div class="feature-info">
+          <span class="feature-name">Dynamic Elements & SPAs</span>
+          <span class="feature-desc">Observe live DOM changes on dynamic pages (Bilibili, YouTube)</span>
+        </div>
+      </label>
+
+      <label class="feature-toggle">
+        <input type="checkbox" id="toggle-popups" checked>
+        <div class="feature-info">
+          <span class="feature-name">Popups & Dropdowns</span>
+          <span class="feature-desc">Translate playback speed, quality, and hover menus</span>
+        </div>
+      </label>
+
+      <label class="feature-toggle">
+        <input type="checkbox" id="toggle-tooltips" checked>
+        <div class="feature-info">
+          <span class="feature-name">Tooltips & Titles</span>
+          <span class="feature-desc">Translate button title tags and ARIA labels</span>
+        </div>
+      </label>
+
+      <label class="feature-toggle">
+        <input type="checkbox" id="toggle-placeholders" checked>
+        <div class="feature-info">
+          <span class="feature-name">Input Placeholders</span>
+          <span class="feature-desc">Translate search and comment input boxes</span>
+        </div>
+      </label>
+    </div>
+
+    <!-- Actions & Cache Stats -->
+    <div class="section actions-section">
+      <button id="btn-translate-now" class="btn btn-primary">
+        ⚡ Translate Page Now
+      </button>
+
+      <div class="cache-info-row">
+        <span class="cache-stat" id="cache-stats-text">Cache: 0 items</span>
+        <button id="btn-clear-cache" class="btn-text">Clear Cache</button>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <button id="btn-open-options" class="btn-link">⚙️ Advanced Options & API Keys</button>
+    </footer>
+  </div>
+
+</body>
+</html>

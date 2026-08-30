@@ -1,0 +1,30 @@
+{
+  "name": "universal-webpage-translator",
+  "version": "1.0.0",
+  "description": "Free, robust universal webpage translator designed for dynamic websites and modern SPAs like Bilibili without breaking functionality",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && node build.js",
+    "test": "npx tsx test/unit-tests.ts && npx tsx test/e2e-simulation-test.ts",
+    "serve": "node test/serve.js"
+  },
+  "keywords": [
+    "translation",
+    "browser-extension",
+    "bilibili",
+    "mutation-observer",
+    "non-destructive-dom",
+    "manifest-v3"
+  ],
+  "author": "Antigravity",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/chrome": "^0.0.280",
+    "@types/jsdom": "^30.0.0",
+    "@types/node": "^22.10.0",
+    "jsdom": "^30.0.1",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.3"
+  }
+}

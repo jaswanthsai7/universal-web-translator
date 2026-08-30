@@ -1,0 +1,1018 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>哔哩哔哩 (゜-゜)つロ 干杯~-bilibili 仿真测试</title>
+  <style>
+    :root {
+      --bili-pink: #fb7299;
+      --bili-blue: #00aeec;
+      --bili-bg: #f6f7f8;
+      --text-main: #18191c;
+      --text-secondary: #61666d;
+      --text-muted: #9499a0;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
+
+    body {
+      background: var(--bili-bg);
+      color: var(--text-main);
+      padding-bottom: 60px;
+    }
+
+    /* Test Runner HUD Header */
+    #test-control-bar {
+      position: sticky;
+      top: 0;
+      z-index: 999999;
+      background: #0f172a;
+      color: #f8fafc;
+      padding: 12px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+
+    .test-status-pill {
+      font-size: 12px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: #22c55e;
+      color: white;
+      font-weight: 600;
+    }
+
+    .test-actions {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .btn-test {
+      background: #3b82f6;
+      border: none;
+      color: white;
+      padding: 6px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 500;
+      font-size: 13px;
+    }
+
+    .btn-test:hover {
+      background: #2563eb;
+    }
+
+    /* Bilibili Top Navbar */
+    .bili-nav {
+      background: white;
+      height: 64px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 32px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+
+    .nav-left {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .bili-logo {
+      color: var(--bili-pink);
+      font-size: 20px;
+      font-weight: 700;
+      text-decoration: none;
+    }
+
+    .nav-link {
+      color: var(--text-main);
+      text-decoration: none;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    .nav-search {
+      flex: 0 1 420px;
+      position: relative;
+    }
+
+    .nav-search input {
+      width: 100%;
+      height: 38px;
+      background: #f1f2f3;
+      border: 1px solid #e3e5e7;
+      border-radius: 8px;
+      padding: 0 40px 0 14px;
+      font-size: 13px;
+      outline: none;
+    }
+
+    .nav-user {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .user-avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: #fb7299;
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    /* Main Content */
+    .main-container {
+      max-width: 1280px;
+      margin: 24px auto;
+      display: grid;
+      grid-template-columns: 860px 1fr;
+      gap: 24px;
+      padding: 0 16px;
+    }
+
+    /* Video Player Box */
+    .player-section {
+      background: white;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    }
+
+    .video-title {
+      font-size: 18px;
+      font-weight: 600;
+      padding: 16px 20px;
+    }
+
+    .video-meta {
+      padding: 0 20px 12px;
+      font-size: 13px;
+      color: var(--text-secondary);
+      display: flex;
+      gap: 16px;
+    }
+
+    .video-viewport {
+      width: 100%;
+      height: 480px;
+      background: #111;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .mock-video-canvas {
+      color: #555;
+      font-size: 16px;
+    }
+
+    /* Danmaku Layer */
+    .bpx-player-danmaku {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      overflow: hidden;
+    }
+
+    .danmaku-item {
+      position: absolute;
+      white-space: nowrap;
+      color: white;
+      font-size: 18px;
+      font-weight: 600;
+      text-shadow: 1px 1px 2px #000;
+      animation: danmakuSlide 8s linear infinite;
+    }
+
+    @keyframes danmakuSlide {
+      from { transform: translateX(860px); }
+      to { transform: translateX(-300px); }
+    }
+
+    /* Video Player Controls Bar */
+    .bpx-player-control-bottom {
+      height: 48px;
+      background: #18191c;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      position: relative;
+    }
+
+    .ctrl-left, .ctrl-right {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+    }
+
+    .ctrl-btn {
+      background: transparent;
+      border: none;
+      color: white;
+      font-size: 13px;
+      cursor: pointer;
+      padding: 4px 8px;
+      border-radius: 4px;
+      transition: background 0.2s;
+    }
+
+    .ctrl-btn:hover {
+      background: rgba(255,255,255,0.15);
+    }
+
+    /* Dynamic Dropdown Menus (Simulating Bilibili Player Popups) */
+    .bpx-dropdown-menu {
+      position: absolute;
+      bottom: 54px;
+      background: rgba(24, 25, 28, 0.95);
+      backdrop-filter: blur(10px);
+      border-radius: 6px;
+      padding: 8px 0;
+      display: none;
+      flex-direction: column;
+      min-width: 100px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+      border: 1px solid rgba(255,255,255,0.1);
+      z-index: 100;
+    }
+
+    .bpx-dropdown-menu.active {
+      display: flex;
+    }
+
+    .bpx-menu-item {
+      padding: 8px 16px;
+      font-size: 13px;
+      color: #e3e5e7;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .bpx-menu-item:hover, .bpx-menu-item.selected {
+      background: rgba(255, 255, 255, 0.15);
+      color: var(--bili-blue);
+    }
+
+    /* Action Buttons under video */
+    .video-actions-bar {
+      padding: 16px 20px;
+      display: flex;
+      gap: 24px;
+      border-bottom: 1px solid #f1f2f3;
+    }
+
+    .action-pill {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      color: var(--text-secondary);
+      background: #f1f2f3;
+      padding: 8px 16px;
+      border-radius: 20px;
+      border: none;
+      transition: all 0.2s;
+    }
+
+    .action-pill:hover {
+      color: var(--bili-pink);
+      background: #ffeef2;
+    }
+
+    /* Strict Reactivity Counter Component (Simulating Vue 3) */
+    .reactivity-test-box {
+      margin: 16px 20px;
+      padding: 14px;
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    /* Comments Section */
+    .comments-section {
+      padding: 24px 20px;
+    }
+
+    .comments-header {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 16px;
+    }
+
+    .comment-input-box {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+
+    .comment-input-box textarea {
+      flex: 1;
+      height: 64px;
+      background: #f1f2f3;
+      border: 1px solid #e3e5e7;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 13px;
+      outline: none;
+      resize: none;
+    }
+
+    .comment-item {
+      display: flex;
+      gap: 14px;
+      padding: 14px 0;
+      border-bottom: 1px solid #f1f2f3;
+    }
+
+    .comment-body {
+      flex: 1;
+    }
+
+    .comment-author {
+      font-weight: 600;
+      font-size: 13px;
+      margin-bottom: 4px;
+    }
+
+    .comment-text {
+      font-size: 14px;
+      line-height: 1.5;
+      margin-bottom: 6px;
+    }
+
+    .comment-footer {
+      display: flex;
+      gap: 16px;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .comment-btn {
+      background: none;
+      border: none;
+      color: var(--text-secondary);
+      cursor: pointer;
+      font-size: 12px;
+    }
+
+    .comment-btn:hover {
+      color: var(--bili-blue);
+    }
+
+    .load-more-btn {
+      width: 100%;
+      padding: 12px;
+      background: #f1f2f3;
+      border: none;
+      border-radius: 8px;
+      color: var(--text-secondary);
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 16px;
+    }
+
+    .load-more-btn:hover {
+      background: #e3e5e7;
+    }
+
+    /* Sidebar */
+    .sidebar-section {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .up-card {
+      background: white;
+      border-radius: 12px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    }
+
+    .up-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .up-info h3 {
+      font-size: 15px;
+    }
+
+    .up-info p {
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    .follow-btn {
+      background: var(--bili-blue);
+      color: white;
+      border: none;
+      padding: 8px;
+      border-radius: 6px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    /* Shadow DOM container */
+    .shadow-dom-card {
+      background: white;
+      border-radius: 12px;
+      padding: 16px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    }
+
+    /* Dynamic User Hover Popover appended to body */
+    .user-hover-popover {
+      position: fixed;
+      background: white;
+      border-radius: 10px;
+      padding: 16px;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.18);
+      border: 1px solid #e3e5e7;
+      z-index: 10000;
+      display: none;
+      width: 240px;
+    }
+
+    /* Modal Dialog */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.5);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 99999;
+    }
+
+    .modal-card {
+      background: white;
+      border-radius: 12px;
+      padding: 24px;
+      width: 360px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Test Automation Bar -->
+  <div id="test-control-bar">
+    <div style="display: flex; align-items: center; gap: 12px;">
+      <span style="font-weight: 700;">Bilibili Dynamic DOM Testbed</span>
+      <span id="vdom-status" class="test-status-pill">VDOM Health: 100% OK</span>
+      <span id="test-log" style="font-size: 12px; color: #94a3b8;">Click options below to simulate dynamic interactions</span>
+    </div>
+
+    <div class="test-actions">
+      <button id="btn-run-all-tests" class="btn-test" style="background: #10b981;">⚡ Auto-Test Dynamic UI</button>
+      <button id="btn-open-login" class="btn-test">登录弹窗 (Modal)</button>
+      <button id="btn-trigger-hover" class="btn-test">触发悬浮卡片 (Popover)</button>
+    </div>
+  </div>
+
+  <!-- Top Navbar -->
+  <nav class="bili-nav">
+    <div class="nav-left">
+      <a href="#" class="bili-logo">哔哩哔哩</a>
+      <a href="#" class="nav-link">首页</a>
+      <a href="#" class="nav-link">番剧</a>
+      <a href="#" class="nav-link">直播</a>
+      <a href="#" class="nav-link">游戏中心</a>
+      <a href="#" class="nav-link">会员购</a>
+      <a href="#" class="nav-link">漫画</a>
+    </div>
+
+    <div class="nav-search">
+      <input type="text" placeholder="搜索视频、番剧、UP主或BV号" title="按下回车搜索视频">
+    </div>
+
+    <div class="nav-user">
+      <div class="user-avatar" id="avatar-element" title="个人中心">UP</div>
+      <span class="nav-link">大会员</span>
+      <span class="nav-link">动态</span>
+      <span class="nav-link">历史</span>
+      <span class="nav-link">创作中心</span>
+    </div>
+  </nav>
+
+  <!-- Main Grid -->
+  <div class="main-container">
+    <!-- Left: Video Player & Comments -->
+    <main>
+      <div class="player-section">
+        <h1 class="video-title">【4K60FPS】超燃动漫剪辑：跨越星空的誓言！</h1>
+        <div class="video-meta">
+          <span>播放 124.5万</span>
+          <span>弹幕 3.2万</span>
+          <span>2026-08-30 18:30:00</span>
+          <span>未经作者授权，禁止转载</span>
+        </div>
+
+        <!-- Video Viewport with Danmaku -->
+        <div class="video-viewport">
+          <div class="mock-video-canvas">
+            ▶ 视频播放器画面 (HTML5 Video Canvas)
+          </div>
+
+          <div class="bpx-player-danmaku">
+            <div class="danmaku-item" style="top: 30px;">前方高能！！！</div>
+            <div class="danmaku-item" style="top: 80px; animation-delay: 2s;">画质太丝滑了吧！</div>
+            <div class="danmaku-item" style="top: 140px; animation-delay: 4s;">泪目，经典永不过时</div>
+            <div class="danmaku-item" style="top: 200px; animation-delay: 1.5s;">此生无悔入动漫！</div>
+          </div>
+        </div>
+
+        <!-- Video Controls Bar -->
+        <div class="bpx-player-control-bottom">
+          <div class="ctrl-left">
+            <button class="ctrl-btn" id="btn-play">▶ 播放</button>
+            <button class="ctrl-btn">02:14 / 04:30</button>
+          </div>
+
+          <div class="ctrl-right">
+            <!-- Quality Dropdown Trigger -->
+            <div style="position: relative;">
+              <button class="ctrl-btn" id="btn-quality-toggle" title="选择视频清晰度">清晰度: 1080P 高清</button>
+              <div class="bpx-dropdown-menu" id="menu-quality">
+                <div class="bpx-menu-item selected">1080P 60帧 高清</div>
+                <div class="bpx-menu-item">720P 高清</div>
+                <div class="bpx-menu-item">480P 清晰</div>
+                <div class="bpx-menu-item">360P 流畅</div>
+              </div>
+            </div>
+
+            <!-- Playback Speed Dropdown Trigger -->
+            <div style="position: relative;">
+              <button class="ctrl-btn" id="btn-speed-toggle" title="播放倍速调节">倍速: 1.0x</button>
+              <div class="bpx-dropdown-menu" id="menu-speed">
+                <div class="bpx-menu-item">2.0x</div>
+                <div class="bpx-menu-item">1.5x</div>
+                <div class="bpx-menu-item">1.25x</div>
+                <div class="bpx-menu-item selected">1.0x 正常</div>
+                <div class="bpx-menu-item">0.75x</div>
+                <div class="bpx-menu-item">0.5x</div>
+              </div>
+            </div>
+
+            <!-- Danmaku Settings Trigger -->
+            <div style="position: relative;">
+              <button class="ctrl-btn" id="btn-danmaku-toggle" title="弹幕显示设置">弹幕设置</button>
+              <div class="bpx-dropdown-menu" id="menu-danmaku" style="min-width: 140px;">
+                <div class="bpx-menu-item">不透明度: 100%</div>
+                <div class="bpx-menu-item">显示区域: 半屏</div>
+                <div class="bpx-menu-item">防挡字幕: 开启</div>
+                <div class="bpx-menu-item">弹幕速度: 适中</div>
+              </div>
+            </div>
+
+            <button class="ctrl-btn" title="网页全屏">网页全屏</button>
+            <button class="ctrl-btn" title="全屏">全屏</button>
+          </div>
+        </div>
+
+        <!-- Video Action Pills (Like, Coin, Collect, Share) -->
+        <div class="video-actions-bar">
+          <button class="action-pill" id="btn-like">👍 点赞 (15.8万)</button>
+          <button class="action-pill" id="btn-coin">🪙 投币 (9.2万)</button>
+          <button class="action-pill" id="btn-fav">⭐ 收藏 (21.4万)</button>
+          <button class="action-pill" id="btn-share">🔗 分享视频</button>
+        </div>
+
+        <!-- Strict VDOM / Reactivity Test Area -->
+        <div class="reactivity-test-box">
+          <div>
+            <span style="font-weight: 600;">Vue 3 / React 响应式节点完整性校验：</span>
+            <span id="vdom-counter-text">当前点击次数: 0</span>
+          </div>
+          <button id="btn-increment-vdom" class="action-pill" style="background: #3b82f6; color: white;">
+            +1 点击测试 (如果DOM被破坏将立即抛错)
+          </button>
+        </div>
+
+        <!-- Comments Section -->
+        <div class="comments-section">
+          <h2 class="comments-header">评论 (3,842)</h2>
+
+          <div class="comment-input-box">
+            <textarea placeholder="发一条友善的评论吧..." title="评论输入框"></textarea>
+            <button class="follow-btn" style="width: 80px;">发表评论</button>
+          </div>
+
+          <div id="comments-container">
+            <div class="comment-item">
+              <div class="user-avatar" style="background: #00aeec;">A</div>
+              <div class="comment-body">
+                <div class="comment-author">追光者</div>
+                <p class="comment-text">这剪辑的转场和节奏太神了，音乐高潮那一段鸡皮疙瘩都起来了！</p>
+                <div class="comment-footer">
+                  <span>2小时前</span>
+                  <button class="comment-btn">点赞 428</button>
+                  <button class="comment-btn">回复</button>
+                  <button class="comment-btn">举报</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="comment-item">
+              <div class="user-avatar" style="background: #10b981;">B</div>
+              <div class="comment-body">
+                <div class="comment-author">极客小明</div>
+                <p class="comment-text">4K 60帧渲染导出的吧？这个色彩分级太有电影感了，收藏了！</p>
+                <div class="comment-footer">
+                  <span>3小时前</span>
+                  <button class="comment-btn">点赞 195</button>
+                  <button class="comment-btn">回复</button>
+                  <button class="comment-btn">举报</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <button id="btn-load-more" class="load-more-btn">
+            加载更多评论 (模拟无限滚动与动态DOM插入)
+          </button>
+        </div>
+      </div>
+    </main>
+
+    <!-- Right Sidebar -->
+    <aside class="sidebar-section">
+      <!-- UP Profile Card -->
+      <div class="up-card">
+        <div class="up-header">
+          <div class="user-avatar" style="width: 48px; height: 48px; font-size: 18px;">创</div>
+          <div class="up-info">
+            <h3>无限动漫工坊</h3>
+            <p>粉丝数 88.5万 · 视频数 142</p>
+          </div>
+        </div>
+        <p style="font-size: 13px; color: var(--text-secondary);">专注于高质量4K超燃动漫混剪，每周五晚准时更新！感谢大家的关注与三连支持！</p>
+        <button class="follow-btn" id="btn-follow">+ 关注 UP主</button>
+      </div>
+
+      <!-- Web Component with Shadow DOM -->
+      <div class="shadow-dom-card">
+        <h4 style="margin-bottom: 8px;">Shadow DOM 隔离组件测试:</h4>
+        <custom-bili-card id="shadow-host"></custom-bili-card>
+      </div>
+    </aside>
+  </div>
+
+  <!-- Dynamic User Hover Popover (Simulating Bilibili User Cards appended to body) -->
+  <div id="user-popover" class="user-hover-popover">
+    <div style="display: flex; gap: 12px; align-items: center; margin-bottom: 10px;">
+      <div class="user-avatar">UP</div>
+      <div>
+        <h4 style="font-size: 14px;">当前在线用户</h4>
+        <p style="font-size: 12px; color: #61666d;">硬币: 1,840 | B币: 20</p>
+      </div>
+    </div>
+    <div style="display: flex; gap: 8px;">
+      <button class="follow-btn" style="flex: 1; font-size: 12px;">个人中心</button>
+      <button class="follow-btn" style="flex: 1; background: #94a3b8; font-size: 12px;">退出登录</button>
+    </div>
+  </div>
+
+  <!-- Modal Dialog -->
+  <div id="login-modal" class="modal-overlay">
+    <div class="modal-card">
+      <h3 style="font-size: 16px; font-weight: 600;">账号快捷登录</h3>
+      <input type="text" placeholder="请输入您的手机号或邮箱账号" style="padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
+      <input type="password" placeholder="请输入密码" style="padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
+      <div style="display: flex; gap: 10px;">
+        <button id="btn-modal-close" class="load-more-btn" style="margin: 0;">取消</button>
+        <button class="follow-btn" style="flex: 1;">立即登录</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Page Interaction & Reactivity Scripts -->
+  <script>
+    // 1. Strict Reactivity & VDOM integrity tracker
+    let vdomClickCount = 0;
+    const vdomTextNode = document.getElementById('vdom-counter-text').firstChild;
+    const initialParent = document.getElementById('vdom-counter-text');
+
+    document.getElementById('btn-increment-vdom').addEventListener('click', () => {
+      try {
+        vdomClickCount++;
+        // If a naive translator destroyed or replaced the original text node, this throws an exception
+        if (vdomTextNode.parentNode !== initialParent) {
+          throw new Error('VDOM Error: Original Text node was detached or replaced by destructive translation!');
+        }
+        vdomTextNode.nodeValue = '当前点击次数: ' + vdomClickCount;
+        document.getElementById('vdom-status').textContent = 'VDOM Health: 100% OK (Count: ' + vdomClickCount + ')';
+        document.getElementById('vdom-status').style.background = '#22c55e';
+      } catch (err) {
+        document.getElementById('vdom-status').textContent = 'VDOM FAILED! ' + err.message;
+        document.getElementById('vdom-status').style.background = '#ef4444';
+        console.error(err);
+      }
+    });
+
+    // 2. Dropdowns (Quality, Speed, Danmaku)
+    function setupDropdown(toggleBtnId, menuId) {
+      const btn = document.getElementById(toggleBtnId);
+      const menu = document.getElementById(menuId);
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const isOpen = menu.classList.contains('active');
+        document.querySelectorAll('.bpx-dropdown-menu').forEach(m => m.classList.remove('active'));
+        if (!isOpen) menu.classList.add('active');
+      });
+      menu.querySelectorAll('.bpx-menu-item').forEach(item => {
+        item.addEventListener('click', (e) => {
+          e.stopPropagation();
+          menu.querySelectorAll('.bpx-menu-item').forEach(i => i.classList.remove('selected'));
+          item.classList.add('selected');
+          btn.textContent = btn.id.includes('speed') ? '倍速: ' + item.textContent : (btn.id.includes('quality') ? '清晰度: ' + item.textContent : btn.textContent);
+          menu.classList.remove('active');
+        });
+      });
+    }
+
+    setupDropdown('btn-speed-toggle', 'menu-speed');
+    setupDropdown('btn-quality-toggle', 'menu-quality');
+    setupDropdown('btn-danmaku-toggle', 'menu-danmaku');
+
+    document.addEventListener('click', () => {
+      document.querySelectorAll('.bpx-dropdown-menu').forEach(m => m.classList.remove('active'));
+    });
+
+    // 3. User Avatar Hover Popover
+    const avatar = document.getElementById('avatar-element');
+    const popover = document.getElementById('user-popover');
+    avatar.addEventListener('mouseenter', () => {
+      const rect = avatar.getBoundingClientRect();
+      popover.style.top = (rect.bottom + 8) + 'px';
+      popover.style.left = (rect.left - 100) + 'px';
+      popover.style.display = 'block';
+    });
+    document.addEventListener('mouseover', (e) => {
+      if (!avatar.contains(e.target) && !popover.contains(e.target)) {
+        popover.style.display = 'none';
+      }
+    });
+
+    // 4. Modal Dialog
+    const modal = document.getElementById('login-modal');
+    document.getElementById('btn-open-login').addEventListener('click', () => {
+      modal.style.display = 'flex';
+    });
+    document.getElementById('btn-modal-close').addEventListener('click', () => {
+      modal.style.display = 'none';
+    });
+
+    // 5. Dynamic Infinite Scroll Comments
+    let commentIndex = 3;
+    document.getElementById('btn-load-more').addEventListener('click', () => {
+      const container = document.getElementById('comments-container');
+      const dynamicComments = [
+        { author: '次元旅行家', text: '分镜把控得太丝滑了！请收下我的膝盖！', time: '刚刚' },
+        { author: '电竞老司机', text: '求BGM歌单！前奏一响整个人燃起来了！', time: '1分钟前' },
+        { author: '动漫观察员', text: '十月新番里最值得三连的剪辑作品，没有之一！', time: '2分钟前' }
+      ];
+
+      dynamicComments.forEach(c => {
+        const item = document.createElement('div');
+        item.className = 'comment-item';
+        item.innerHTML = `
+          <div class="user-avatar" style="background: #8b5cf6;">${commentIndex++}</div>
+          <div class="comment-body">
+            <div class="comment-author">${c.author}</div>
+            <p class="comment-text">${c.text}</p>
+            <div class="comment-footer">
+              <span>${c.time}</span>
+              <button class="comment-btn">点赞 (新)</button>
+              <button class="comment-btn">回复</button>
+              <button class="comment-btn">举报</button>
+            </div>
+          </div>
+        `;
+        container.appendChild(item);
+      });
+      document.getElementById('test-log').textContent = '动态注入了3条新评论，MutationObserver应捕获并自动翻译！';
+    });
+
+    // 6. Shadow DOM Web Component
+    class CustomBiliCard extends HTMLElement {
+      connectedCallback() {
+        if (!this.shadowRoot) {
+          const shadow = this.attachShadow({ mode: 'open' });
+          shadow.innerHTML = `
+            <style>
+              .shadow-box {
+                background: #f8fafc;
+                border: 1px dashed #cbd5e1;
+                padding: 10px;
+                border-radius: 6px;
+                font-size: 13px;
+              }
+              .shadow-title {
+                color: #0284c7;
+                font-weight: 600;
+                margin-bottom: 4px;
+              }
+            </style>
+            <div class="shadow-box">
+              <div class="shadow-title">Shadow DOM 内部标题</div>
+              <p>这是封装在Shadow Root内部的推荐视频列表，支持递归扫描与翻译。</p>
+            </div>
+          `;
+        }
+      }
+    }
+    customElements.define('custom-bili-card', CustomBiliCard);
+
+    // 7. Automated Test Runner Button
+    document.getElementById('btn-run-all-tests').addEventListener('click', async () => {
+      const log = document.getElementById('test-log');
+      log.textContent = '正在执行全套动态UI交互测试...';
+
+      // Click increment
+      document.getElementById('btn-increment-vdom').click();
+
+      // Open Speed dropdown
+      document.getElementById('btn-speed-toggle').click();
+      await new Promise(r => setTimeout(r, 600));
+
+      // Open Quality dropdown
+      document.getElementById('btn-quality-toggle').click();
+      await new Promise(r => setTimeout(r, 600));
+
+      // Load more comments
+      document.getElementById('btn-load-more').click();
+      await new Promise(r => setTimeout(r, 600));
+
+      // Hover popover
+      avatar.dispatchEvent(new MouseEvent('mouseenter'));
+      await new Promise(r => setTimeout(r, 800));
+
+      log.textContent = '✔ 动态UI交互测试全部执行完毕！检查页面覆盖翻译与控制台。';
+    });
+  </script>
+
+  <!-- Mock Extension Bridge & Compiled Content Script for Standalone Browser Testing -->
+  <script>
+    if (typeof chrome === 'undefined' || !chrome.runtime || !chrome.runtime.sendMessage) {
+      window.chrome = {
+        runtime: {
+          sendMessage: async (msg) => {
+            if (msg.type === 'GET_SETTINGS') {
+              return {
+                success: true,
+                settings: {
+                  enabled: true,
+                  sourceLang: 'auto',
+                  targetLang: 'en',
+                  provider: 'google',
+                  fallbackChain: ['google', 'libretranslate'],
+                  mode: 'translated-only',
+                  translateDynamic: true,
+                  translatePopups: true,
+                  translateTooltips: true,
+                  translatePlaceholders: true,
+                  siteSettings: {},
+                  appearance: { fontSize: 13, opacity: 0.95, theme: 'glass-dark', showFloatingHUD: true }
+                }
+              };
+            }
+            if (msg.type === 'TRANSLATE_BATCH') {
+              const dict = {
+                '哔哩哔哩': 'Bilibili',
+                '首页': 'Home',
+                '番剧': 'Anime',
+                '直播': 'Live',
+                '游戏中心': 'Game Center',
+                '会员购': 'Shop',
+                '漫画': 'Manga',
+                '大会员': 'VIP',
+                '动态': 'Moments',
+                '历史': 'History',
+                '创作中心': 'Creator Studio',
+                '【4K60FPS】超燃动漫剪辑：跨越星空的誓言！': '[4K60FPS] Ultra Anime AMV: Oath Across the Stars!',
+                '未经作者授权，禁止转载': 'Reproduction prohibited without author permission',
+                '▶ 播放': '▶ Play',
+                '选择视频清晰度': 'Select Video Quality',
+                '播放倍速调节': 'Playback Speed Control',
+                '倍速: 1.0x': 'Speed: 1.0x',
+                '清晰度: 1080P 高清': 'Quality: 1080P HD',
+                '1080P 60帧 高清': '1080P 60FPS HD',
+                '720P 高清': '720P HD',
+                '480P 清晰': '480P Clean',
+                '360P 流畅': '360P Smooth',
+                '1.0x 正常': '1.0x Normal',
+                '2.0x': '2.0x',
+                '1.5x': '1.5x',
+                '1.25x': '1.25x',
+                '0.75x': '0.75x',
+                '0.5x': '0.5x',
+                '弹幕设置': 'Danmaku Settings',
+                '不透明度: 100%': 'Opacity: 100%',
+                '显示区域: 半屏': 'Display Area: Half Screen',
+                '防挡字幕: 开启': 'Subtitle Protection: ON',
+                '弹幕速度: 适中': 'Danmaku Speed: Medium',
+                '网页全屏': 'Web Fullscreen',
+                '全屏': 'Fullscreen',
+                '点赞': 'Like',
+                '投币': 'Coin',
+                '收藏': 'Favorite',
+                '分享视频': 'Share Video',
+                '👍 点赞 (15.8万)': '👍 Like (158K)',
+                '🪙 投币 (9.2万)': '🪙 Coin (92K)',
+                '⭐ 收藏 (21.4万)': '⭐ Favorite (214K)',
+                '🔗 分享视频': '🔗 Share Video',
+                '播放 124.5万': '1.24M Views',
+                '弹幕 3.2万': '32K Danmaku',
+                '评论 (3,842)': 'Comments (3,842)',
+                '发一条友善的评论吧...': 'Post a friendly comment...',
+                '发表评论': 'Post Comment',
+                '回复': 'Reply',
+                '举报': 'Report',
+                '点赞 428': 'Like 428',
+                '点赞 195': 'Like 195',
+                '点赞 (新)': 'Like',
+                '2小时前': '2h ago',
+                '3小时前': '3h ago',
+                '刚刚': 'Just now',
+                '1分钟前': '1m ago',
+                '2分钟前': '2m ago',
+                '追光者': 'LightChaser',
+                '极客小明': 'Geek Ming',
+                '次元旅行家': 'Dimension Traveler',
+                '电竞老司机': 'Esports Veteran',
+                '动漫观察员': 'Anime Reviewer',
+                '加载更多评论 (模拟无限滚动与动态DOM插入)': 'Load More Comments',
+                '无限动漫工坊': 'Infinite Anime Workshop',
+                '+ 关注 UP主': '+ Follow Creator',
+                '粉丝数 88.5万 · 视频数 142': '885K Followers · 142 Videos',
+                '专注于高质量4K超燃动漫混剪，每周五晚准时更新！感谢大家的关注与三连支持！': 'Dedicated to high-quality 4K anime edits, updated every Friday night! Thank you for your support!',
+                'Shadow DOM 隔离组件测试:': 'Shadow DOM Component Test:',
+                'Shadow DOM 内部标题': 'Shadow DOM Internal Title',
+                '这是封装在Shadow Root内部的推荐视频列表，支持递归扫描与翻译。': 'This is recommended video list encapsulated inside Shadow Root with recursive scan and translation support.',
+                '当前在线用户': 'Current Online User',
+                '硬币: 1,840 | B币: 20': 'Coins: 1,840 | B-Coins: 20',
+                '个人中心': 'User Center',
+                '退出登录': 'Log Out',
+                '账号快捷登录': 'Quick Account Login',
+                '请输入您的手机号或邮箱账号': 'Enter phone number or email',
+                '请输入密码': 'Enter password',
+                '取消': 'Cancel',
+                '立即登录': 'Log In Now',
+                '分镜把控得太丝滑了！请收下我的膝盖！': 'The storyboarding is so smooth! Take my respect!',
+                '求BGM歌单！前奏一响整个人燃起来了！': 'Need BGM playlist! The intro hyped me up so much!',
+                '十月新番里最值得三连的剪辑作品，没有之一！': 'The best anime edit of the season, bar none!'
+              };
+
+              const translations = msg.texts.map(t => dict[t.trim()] || t.trim());
+              return { success: true, translations, providerUsed: 'simulation-engine' };
+            }
+            return { success: true };
+          },
+          onMessage: { addListener: () => {} }
+        }
+      };
+    }
+  </script>
+  <script src="../dist/content.js"></script>
+</body>
+</html>
