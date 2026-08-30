@@ -1,15 +1,15 @@
-# 📺 Bilibili English (Manifest V3)
+# 📺 BiliBili English (Manifest V3)
 
 > **Fast, Native In-Place Translation Extension for Bilibili and Modern SPAs (React & Vue 3)**
 
-**Bilibili English** is a modern, high-performance browser extension that translates Bilibili directly in place without breaking page layout, video playback, Vue/React reactivity, or user interactions.
+**BiliBili English** is a modern, high-performance browser extension that translates Bilibili directly in place without breaking page layout, video playback, Vue/React reactivity, or user interactions.
 
 ---
 
 ## ✨ Key Highlights & Features
 
 ### 1. ⚡ Native In-Place DOM Translation (`node.nodeValue`)
-* **Zero Floating Coordinate Drift**: Unlike older overlay-based translators where translated text floats in detached boxes and drifts into the air during scrolling, Bilibili English modifies text directly inside existing DOM Text Nodes.
+* **Zero Floating Coordinate Drift**: Unlike older overlay-based translators where translated text floats in detached boxes and drifts into the air during scrolling, BiliBili English modifies text directly inside existing DOM Text Nodes.
 * **100% React & Vue 3 Safe**: Preserves exact DOM node references and whitespace boundaries. Virtual DOM reconciliation never crashes (`removeChild` / `insertBefore` errors are completely eliminated).
 * **Full Interactivity Preserved**: Native buttons, video scrubbing controls, player menus, hover states, and input fields remain fully functional.
 
@@ -49,7 +49,7 @@
 
 ## 🔒 Privacy Policy & Data Handling
 
-Your privacy is a fundamental core principle of **Bilibili English**.
+Your privacy is a fundamental core principle of **BiliBili English**.
 
 ### 1. Zero Tracking & Zero Telemetry
 * We **do NOT** collect, store, track, or transmit your browsing history, visited URLs, search queries, video watch habits, personal information, or device fingerprints.
@@ -96,7 +96,7 @@ npm run build
 2. Enable **Developer mode** (toggle in the top-right corner).
 3. Click **Load unpacked**.
 4. Select the project directory (`universal-web-translator`).
-5. Pin **Bilibili English** to your toolbar and visit [bilibili.com](https://www.bilibili.com)!
+5. Pin **BiliBili English** to your toolbar and visit [bilibili.com](https://www.bilibili.com)!
 
 ---
 

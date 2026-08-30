@@ -1101,7 +1101,7 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
         ">
           <div style="display: flex; justify-content: space-between; align-items: center;">
             <div style="display: flex; align-items: center; gap: 6px; font-weight: 600;">
-              <span>📺 Bilibili English</span>
+              <span>📺 BiliBili English</span>
             </div>
             <button id="webtrans-close-btn" style="
               background: transparent;
