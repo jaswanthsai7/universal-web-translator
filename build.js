@@ -1,6 +1,7 @@
 import { build } from 'vite';
 import path from 'path';
 import fs from 'fs';
+import { execSync } from 'child_process';
 import { fileURLToPath } from 'url';
 import { generateAllIcons } from './generate-icons.js';
 
@@ -129,6 +130,7 @@ async function buildExtension() {
   );
 
   generateAllIcons(path.resolve(distDir, 'icons'));
+  generateAllIcons(path.resolve(__dirname, 'icons'));
 
   // 6. Also sync built files to root directory so loading root or dist/ works seamlessly
   console.log('🔄 Syncing built extension files to root directory for direct loading...');
@@ -144,6 +146,17 @@ async function buildExtension() {
     for (const file of fs.readdirSync(distAssets)) {
       fs.copyFileSync(path.join(distAssets, file), path.join(rootAssets, file));
     }
+  }
+
+  // 7. Generate store-ready ZIP package (manifest.json at archive root)
+  console.log('📦 Creating store-ready ZIP archive (bilibili-english-translator.zip)...');
+  const zipPath = path.resolve(__dirname, 'bilibili-english-translator.zip');
+  if (fs.existsSync(zipPath)) fs.unlinkSync(zipPath);
+  try {
+    execSync(`powershell -Command "Compress-Archive -Path '${distDir}\\*' -DestinationPath '${zipPath}' -Force"`, { stdio: 'inherit' });
+    console.log('🎉 Store-ready ZIP package created at root: bilibili-english-translator.zip');
+  } catch (zipErr) {
+    console.warn('⚠️ Could not automatically create zip via PowerShell:', zipErr.message);
   }
 
   console.log('✅ Extension build complete! Ready at both root and dist/');

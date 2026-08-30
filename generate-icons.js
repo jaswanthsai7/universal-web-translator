@@ -68,21 +68,28 @@ export function createBilibiliIconPNG(size) {
       const dAnt1 = sdSegment(x, y, a1x, a1y, a1bx, a1by) - strokeW / 2;
       const dAnt2 = sdSegment(x, y, a2x, a2y, a2bx, a2by) - strokeW / 2;
 
-      // 3. Distance to eyes
+      // Distance to blue body (box and antennae)
+      const dBody = Math.min(dBox, dAnt1, dAnt2);
+      const alphaBody = Math.max(0, Math.min(1, 0.5 - dBody / (pixelDelta * 1.2)));
+
+      // 3. Distance to eyes (rendered in Bilibili Pink #FB7299)
       const dEye1 = Math.sqrt((x + eyeOffsetX) ** 2 + ((y - eyeCenterY) / 1.2) ** 2) - eyeRadius;
       const dEye2 = Math.sqrt((x - eyeOffsetX) ** 2 + ((y - eyeCenterY) / 1.2) ** 2) - eyeRadius;
+      const dEyes = Math.min(dEye1, dEye2);
+      const alphaEyes = Math.max(0, Math.min(1, 0.5 - dEyes / (pixelDelta * 1.2)));
 
-      // Min distance to blue elements
-      const minD = Math.min(dBox, dAnt1, dAnt2, dEye1, dEye2);
-
-      // Anti-aliased alpha
-      const alpha = Math.max(0, Math.min(1, 0.5 - minD / (pixelDelta * 1.2)));
-
-      if (alpha > 0) {
+      if (alphaEyes > 0) {
+        // Bilibili Pink: #FB7299 -> RGB(251, 114, 153)
+        raw[offset] = 251;
+        raw[offset + 1] = 114;
+        raw[offset + 2] = 153;
+        raw[offset + 3] = Math.round(alphaEyes * 255);
+      } else if (alphaBody > 0) {
+        // Bilibili Cyan Blue: #23ADE5 -> RGB(35, 173, 229)
         raw[offset] = R;
         raw[offset + 1] = G;
         raw[offset + 2] = B;
-        raw[offset + 3] = Math.round(alpha * 255);
+        raw[offset + 3] = Math.round(alphaBody * 255);
       } else {
         raw[offset] = 0;
         raw[offset + 1] = 0;
