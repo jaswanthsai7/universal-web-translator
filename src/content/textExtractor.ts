@@ -11,20 +11,22 @@ import { isIgnoredElement, isTranslatableString } from '../utils/dom';
  *   - CSS pseudo-element content: ::before, ::after
  */
 export class TextExtractor {
-  private processedNodes = new WeakSet<Node>();
+  private lastExtractedText = new WeakMap<Node, string>();
   private lastExtractedAttrValues = new WeakMap<HTMLElement, Map<string, string>>();
 
   reset() {
-    this.processedNodes = new WeakSet<Node>();
+    this.lastExtractedText = new WeakMap<Node, string>();
     this.lastExtractedAttrValues = new WeakMap<HTMLElement, Map<string, string>>();
   }
 
   isProcessed(node: Node): boolean {
-    return this.processedNodes.has(node);
+    const text = node.nodeValue?.trim();
+    return this.lastExtractedText.get(node) === text;
   }
 
-  markProcessed(node: Node) {
-    this.processedNodes.add(node);
+  markProcessed(node: Node, text?: string) {
+    const val = text ?? (node.nodeValue?.trim() || '');
+    this.lastExtractedText.set(node, val);
   }
 
   /**
@@ -34,6 +36,25 @@ export class TextExtractor {
   extractFromRoot(root: Node, settings: TranslatorSettings): TextExtractTarget[] {
     const targets: TextExtractTarget[] = [];
     if (!root) return targets;
+
+    // Direct handling if root is a TextNode (e.g. from characterData mutation)
+    if (root.nodeType === Node.TEXT_NODE) {
+      const textNode = root as Text;
+      const parent = textNode.parentElement;
+      if (parent && !isIgnoredElement(parent)) {
+        const text = textNode.nodeValue?.trim() ?? '';
+        if (text && isTranslatableString(text) && this.lastExtractedText.get(textNode) !== text) {
+          this.lastExtractedText.set(textNode, text);
+          targets.push({
+            node: textNode,
+            type: 'text',
+            originalText: text,
+            element: parent,
+          });
+        }
+      }
+      return targets;
+    }
 
     if (root instanceof HTMLElement && isIgnoredElement(root)) return targets;
 
@@ -49,9 +70,9 @@ export class TextExtractor {
             return NodeFilter.FILTER_SKIP;
           }
           if (node.nodeType === Node.TEXT_NODE) {
-            if (this.processedNodes.has(node)) return NodeFilter.FILTER_REJECT;
             const text = node.nodeValue?.trim();
             if (!text || !isTranslatableString(text)) return NodeFilter.FILTER_REJECT;
+            if (this.lastExtractedText.get(node) === text) return NodeFilter.FILTER_REJECT;
             const parent = node.parentElement;
             if (!parent || isIgnoredElement(parent)) return NodeFilter.FILTER_REJECT;
             return NodeFilter.FILTER_ACCEPT;
@@ -67,7 +88,7 @@ export class TextExtractor {
         const text = currentNode.nodeValue?.trim() ?? '';
         const parent = currentNode.parentElement;
         if (parent) {
-          this.processedNodes.add(currentNode);
+          this.lastExtractedText.set(currentNode, text);
           targets.push({
             node: currentNode,
             type: 'text',

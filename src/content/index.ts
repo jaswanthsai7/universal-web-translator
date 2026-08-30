@@ -56,7 +56,7 @@ class ContentTranslator {
 
   constructor() {
     this.textExtractor = new TextExtractor();
-    this.overlayManager = new OverlayManager(this.settings);
+    this.overlayManager = new OverlayManager(this.settings, this.textExtractor);
 
     // ─────────────────────────────────────────────────────────────────────
     // Create the TranslationQueue — passes translations to the overlay
@@ -344,6 +344,15 @@ class ContentTranslator {
         }
       }
     });
+
+    // Re-verify visible navigation once all hydration scripts complete
+    if (document.readyState === 'complete') {
+      setTimeout(() => this.immediateViewportScan(), 500);
+    } else {
+      window.addEventListener('load', () => {
+        setTimeout(() => this.immediateViewportScan(), 500);
+      }, { once: true });
+    }
   }
 
   private async saveSettings(newSettings: Partial<TranslatorSettings>) {

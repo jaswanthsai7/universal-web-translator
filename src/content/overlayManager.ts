@@ -1,4 +1,5 @@
 import { TextExtractTarget, TranslatorSettings } from '../types';
+import type { TextExtractor } from './textExtractor';
 
 export interface TextNodeState {
   original: string;
@@ -10,15 +11,6 @@ export interface TextNodeState {
 
 /**
  * In-Place Native DOM Translation Engine.
- *
- * Inspired by high-performance extensions like "BiliBili To English":
- * - Translates text directly in-place by updating `node.nodeValue` while
- *   preserving leading and trailing whitespace.
- * - Leaves the framework's DOM hierarchy 100% intact (preserves Node instances,
- *   event listeners, flexbox/grid layout, and CSS styles).
- * - Zero floating coordinate drift: text NEVER "goes into the air".
- * - Supports bilingual mode via lightweight inline sibling tags (`data-webtrans-owned="1"`).
- * - Self-mutation aware: ignores its own characterData mutations to prevent loops.
  */
 export class OverlayManager {
   private textState = new WeakMap<Node, TextNodeState>();
@@ -26,9 +18,11 @@ export class OverlayManager {
   private activeExtraNodes = new Set<HTMLElement>();
   private modifiedAttributes = new Set<{ element: HTMLElement; attr: string; original: string }>();
   private settings: TranslatorSettings;
+  private textExtractor?: TextExtractor;
 
-  constructor(settings: TranslatorSettings) {
+  constructor(settings: TranslatorSettings, textExtractor?: TextExtractor) {
     this.settings = settings;
+    this.textExtractor = textExtractor;
   }
 
   updateSettings(settings: TranslatorSettings) {
@@ -111,6 +105,9 @@ export class OverlayManager {
       state.translation = translatedText;
       state.applied = true;
       this.activeNodes.add(node);
+      if (this.textExtractor) {
+        this.textExtractor.markProcessed(node, withWs.trim());
+      }
     } else if (mode === 'dual') {
       // Dual / bilingual mode: keep original text in nodeValue and insert adjacent span
       if (node.nodeValue !== state.original) {

@@ -78,27 +78,48 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
   }
   class TextExtractor {
     constructor() {
-      __publicField(this, "processedNodes", /* @__PURE__ */ new WeakSet());
+      __publicField(this, "lastExtractedText", /* @__PURE__ */ new WeakMap());
       __publicField(this, "lastExtractedAttrValues", /* @__PURE__ */ new WeakMap());
     }
     reset() {
-      this.processedNodes = /* @__PURE__ */ new WeakSet();
+      this.lastExtractedText = /* @__PURE__ */ new WeakMap();
       this.lastExtractedAttrValues = /* @__PURE__ */ new WeakMap();
     }
     isProcessed(node) {
-      return this.processedNodes.has(node);
+      var _a;
+      const text = (_a = node.nodeValue) == null ? void 0 : _a.trim();
+      return this.lastExtractedText.get(node) === text;
     }
-    markProcessed(node) {
-      this.processedNodes.add(node);
+    markProcessed(node, text) {
+      var _a;
+      const val = text ?? (((_a = node.nodeValue) == null ? void 0 : _a.trim()) || "");
+      this.lastExtractedText.set(node, val);
     }
     /**
      * Extract all translatable targets from a DOM subtree.
      * Returns immediately without modifying the DOM.
      */
     extractFromRoot(root, settings) {
-      var _a;
+      var _a, _b;
       const targets = [];
       if (!root) return targets;
+      if (root.nodeType === Node.TEXT_NODE) {
+        const textNode = root;
+        const parent = textNode.parentElement;
+        if (parent && !isIgnoredElement(parent)) {
+          const text = ((_a = textNode.nodeValue) == null ? void 0 : _a.trim()) ?? "";
+          if (text && isTranslatableString(text) && this.lastExtractedText.get(textNode) !== text) {
+            this.lastExtractedText.set(textNode, text);
+            targets.push({
+              node: textNode,
+              type: "text",
+              originalText: text,
+              element: parent
+            });
+          }
+        }
+        return targets;
+      }
       if (root instanceof HTMLElement && isIgnoredElement(root)) return targets;
       const doc = root.ownerDocument ?? root;
       const walker = doc.createTreeWalker(
@@ -113,9 +134,9 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
               return NodeFilter.FILTER_SKIP;
             }
             if (node.nodeType === Node.TEXT_NODE) {
-              if (this.processedNodes.has(node)) return NodeFilter.FILTER_REJECT;
               const text = (_a2 = node.nodeValue) == null ? void 0 : _a2.trim();
               if (!text || !isTranslatableString(text)) return NodeFilter.FILTER_REJECT;
+              if (this.lastExtractedText.get(node) === text) return NodeFilter.FILTER_REJECT;
               const parent = node.parentElement;
               if (!parent || isIgnoredElement(parent)) return NodeFilter.FILTER_REJECT;
               return NodeFilter.FILTER_ACCEPT;
@@ -127,10 +148,10 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
       let currentNode = walker.nextNode();
       while (currentNode) {
         if (currentNode.nodeType === Node.TEXT_NODE) {
-          const text = ((_a = currentNode.nodeValue) == null ? void 0 : _a.trim()) ?? "";
+          const text = ((_b = currentNode.nodeValue) == null ? void 0 : _b.trim()) ?? "";
           const parent = currentNode.parentElement;
           if (parent) {
-            this.processedNodes.add(currentNode);
+            this.lastExtractedText.set(currentNode, text);
             targets.push({
               node: currentNode,
               type: "text",
@@ -267,13 +288,15 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
     return inner.replace(/\\n/g, "\n").replace(/\\t/g, "	");
   }
   class OverlayManager {
-    constructor(settings) {
+    constructor(settings, textExtractor) {
       __publicField(this, "textState", /* @__PURE__ */ new WeakMap());
       __publicField(this, "activeNodes", /* @__PURE__ */ new Set());
       __publicField(this, "activeExtraNodes", /* @__PURE__ */ new Set());
       __publicField(this, "modifiedAttributes", /* @__PURE__ */ new Set());
       __publicField(this, "settings");
+      __publicField(this, "textExtractor");
       this.settings = settings;
+      this.textExtractor = textExtractor;
     }
     updateSettings(settings) {
       const oldMode = this.settings.mode;
@@ -333,6 +356,9 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
         state.translation = translatedText;
         state.applied = true;
         this.activeNodes.add(node);
+        if (this.textExtractor) {
+          this.textExtractor.markProcessed(node, withWs.trim());
+        }
       } else if (mode === "dual") {
         if (node.nodeValue !== state.original) {
           node.nodeValue = state.original;
@@ -2350,7 +2376,7 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
       __publicField(this, "floatingHUD");
       __publicField(this, "isDisconnected", false);
       this.textExtractor = new TextExtractor();
-      this.overlayManager = new OverlayManager(this.settings);
+      this.overlayManager = new OverlayManager(this.settings, this.textExtractor);
       this.queue = new TranslationQueue(
         this.settings,
         (target, translatedText) => {
@@ -2570,6 +2596,13 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
           }
         }
       });
+      if (document.readyState === "complete") {
+        setTimeout(() => this.immediateViewportScan(), 500);
+      } else {
+        window.addEventListener("load", () => {
+          setTimeout(() => this.immediateViewportScan(), 500);
+        }, { once: true });
+      }
     }
     async saveSettings(newSettings) {
       var _a;

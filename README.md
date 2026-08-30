@@ -1,189 +1,117 @@
 # 📺 Bilibili English (Manifest V3)
 
-> **A Fast, Robust Real-Time Translation Extension for Bilibili and Modern SPAs (React/Vue)**
+> **Fast, Native In-Place Translation Extension for Bilibili and Modern SPAs (React & Vue 3)**
 
-**Bilibili English** provides seamless, real-time in-place translation for Bilibili content without breaking website functionality, Vue/React reactivity, or layout geometry. It features an embedded 980+ term local dictionary for instant 0ms translation of interface categories, buttons, and player controls, coupled with background AI/API translation for dynamic video titles and comments.
-
----
-
-## 🎯 Key Architectural Advantages
-
-| Feature | Standard Browser Translators | Universal Webpage Translator |
-| :--- | :--- | :--- |
-| **DOM Preservation** | Destructive (`<font>` tag injection / node replacement) | **Non-destructive** visual overlay / isolated annotations |
-| **React / Vue 3 Safety** | Frequent crashes (`removeChild` / `insertBefore` errors) | **100% Immune**; original VDOM text node references untouched |
-| **Dynamic Menus & Dropdowns** | Usually untranslated or breaks menu click events | **Real-time translation** within 16ms via debounced MutationObserver |
-| **Interactivity** | Overwriting DOM breaks event listeners & focus | Full interactivity preserved via `pointer-events: none` |
-| **Shadow DOM Support** | Ignored or inaccessible | **Recursive traversal** & sub-observers on open Shadow Roots |
-| **Provider Fallback** | Locked to a single proprietary service | **Unified abstraction with automatic fallback chain** |
-| **Caching** | Basic page cache | **Two-tier cache** (Memory L1 + Persistent L2 LRU Storage) |
+**Bilibili English** is a modern, high-performance browser extension that translates Bilibili directly in place without breaking page layout, video playback, Vue/React reactivity, or user interactions.
 
 ---
 
-## 🏗️ Architecture Overview
+## ✨ Key Highlights & Features
 
-```mermaid
-graph TD
-    subgraph Webpage [Webpage Runtime - Pristine DOM]
-        PageDOM[Original DOM & Vue 3 / React VDOM]
-        DynamicMenus[Speed Menus, Quality Dropdowns, Hover Popovers]
-    end
+### 1. ⚡ Native In-Place DOM Translation (`node.nodeValue`)
+* **Zero Floating Coordinate Drift**: Unlike older overlay-based translators where translated text floats in detached boxes and drifts into the air during scrolling, Bilibili English modifies text directly inside existing DOM Text Nodes.
+* **100% React & Vue 3 Safe**: Preserves exact DOM node references and whitespace boundaries. Virtual DOM reconciliation never crashes (`removeChild` / `insertBefore` errors are completely eliminated).
+* **Full Interactivity Preserved**: Native buttons, video scrubbing controls, player menus, hover states, and input fields remain fully functional.
 
-    subgraph ContentScript [Content Script Layer]
-        MutObs[Debounced MutationObserver + Shadow Root Scanner]
-        Extractor[Text Extractor & Filter]
-        OverlayEngine[Overlay & Annotation Manager]
-        FloatingHUD[Collapsible On-Page HUD]
-    end
+### 2. 🚀 Instant 0ms Local Dictionary (980+ Terms)
+* **Zero-Latency UI Localization**: Includes an embedded dictionary of 980+ curated Bilibili-specific terms. Interface categories (`专栏` ➔ **Posts**, `活动` ➔ **Events**, `社区中心` ➔ **Community**, `直播` ➔ **Live**, `课堂` ➔ **Classes**, `新歌热榜` ➔ **Charts**) translate in **0 milliseconds** synchronously before the first paint.
+* **Smart Metrics & Time Formatters**:
+  * View counts: `12.5万次播放` ➔ **125K views**
+  * Danmaku counts: `1053条弹幕` ➔ **1,053 danmaku**
+  * Relative timestamps: `3小时前` ➔ **3h ago**, `刚刚` ➔ **Just now**
+  * Material counters: `视频素材 9999+` ➔ **Video Materials 9999+**
 
-    subgraph BackgroundWorker [Service Worker]
-        BatchQueue[Batch Request Queue & Concurrency Gate]
-        CacheL1L2[In-Memory + Storage Cache with LRU]
-        ProviderMgr[Provider Manager & Fallback Chain]
-    end
+### 3. 🛡️ Hydration-Resistant Mutation Engine
+* **Survives Client-Side Framework Hydration**: When Bilibili's Vue 3 hydration script loads asynchronously and attempts to reset text nodes back to original Chinese, the dynamic `MutationObserver` detects the change and re-applies the translation in 0ms.
+* **Infinite-Scroll & Live Comments**: Translates new video cards, comment replies, and dynamic popovers as you scroll down the page.
 
-    subgraph Engines [Translation Providers]
-        GoogleWeb[Google Web Free RPC]
-        LibreTranslate[LibreTranslate Engine]
-        MyMemory[MyMemory Public API]
-        CustomAI[Custom OpenAI / Ollama / LLM]
-    end
+### 4. 🔍 Dynamic Search Bar Recommendations
+* **Real-time Placeholder Synchronization**: Watches Bilibili's search input for dynamic recommendation rotations (e.g. `蜘蛛侠之崭新之日` ➔ *Spider-Man: Brand New Day*) and synchronizes translated text across `.placeholder`, `setAttribute('placeholder')`, and `title`.
 
-    PageDOM --> MutObs
-    DynamicMenus --> MutObs
-    MutObs --> Extractor
-    Extractor --> OverlayEngine
-    OverlayEngine <-->|Batch Messages| BatchQueue
-    BatchQueue <--> CacheL1L2
-    BatchQueue --> ProviderMgr
-    ProviderMgr --> Engines
-    OverlayEngine -.->|pointer-events: none| PageDOM
-```
+### 5. 🤖 Multi-Engine Support with Automatic Fallback Chain
+* **Supported Providers**:
+  * **Google Web (Free / Instant)**: High-speed, public client RPC.
+  * **LibreTranslate**: Open-source, self-hostable translation.
+  * **MyMemory**: Public crowd-sourced translation API.
+  * **Custom AI / Local LLM**: Compatible with any OpenAI-style endpoint (Ollama, OpenAI, Groq, DeepSeek, LocalAI).
+* **Automatic Fallback Chain**: If the primary provider encounters a rate limit or timeout, the next fallback engine takes over seamlessly.
 
-1. **Non-Destructive Visual Layering**:
-   - Translations are rendered in `#universal-webtrans-overlay-container`, pinned to `document.documentElement` with `pointer-events: none !important;`.
-   - All mouse clicks, hovers, drags, video scrubber interactions, and keystrokes pass directly to the website.
-2. **Dynamic UI Detection**:
-   - Listens to `childList` and visibility mutations (`style.display`, `class`, `aria-expanded`).
-   - Translates Bilibili's player speed menus, quality selectors, user hover cards, and infinite-scroll comments immediately as they appear.
-3. **Multi-Provider Engine Abstraction & Fallbacks**:
-   - **Google Web (Free)**: Public high-speed client RPC with auto-detection.
-   - **LibreTranslate**: Open-source self-hosted or public instances.
-   - **MyMemory**: Free public translation API.
-   - **Custom AI**: OpenAI-compatible endpoints (OpenAI, Ollama, Groq, DeepSeek).
-   - If the primary provider hits a rate limit, the fallback chain immediately tries the secondary provider.
-4. **Aggressive Two-Tier Caching**:
-   - L1: High-speed in-memory map.
-   - L2: Persistent `chrome.storage.local` with LRU eviction and 7-day TTL.
-   - Drastically cuts latency and API usage on repetitive UI strings (e.g. "点赞", "收藏", "关注", "回复").
+### 6. 🎨 System-Adaptive Design & Clean UI
+* **Auto Light / Dark Theme**: Automatically matches your operating system or browser theme, with a 1-click manual theme toggle (`🌓` / `☀️` / `🌙`).
+* **Sleek Custom Dropdowns**: Floating popover cards with smooth transitions and checkmarks (`✓`) replace clunky native OS select menus.
+* **Snug, Proportionate Layout**: Form-fitted interface with default-expanded advanced controls and a dedicated centered Settings page (`options.html`).
+* **3 Translation Modes**:
+  * **✨ Translated-Only**: Clean native English replacement.
+  * **📝 Bilingual**: Original Chinese + adjacent English badge.
+  * **🔍 Hover**: Reveals original Chinese text on mouse hover.
 
 ---
 
-## 🚀 Quick Setup & Installation
+## 🔒 Privacy Policy & Data Handling
 
-### Step 1: Build the Extension
+Your privacy is a fundamental core principle of **Bilibili English**.
+
+### 1. Zero Tracking & Zero Telemetry
+* We **do NOT** collect, store, track, or transmit your browsing history, visited URLs, search queries, video watch habits, personal information, or device fingerprints.
+* The extension contains **no analytics SDKs** (no Google Analytics, no Mixpanel, no telemetry beacons).
+
+### 2. Strictly Local Execution
+* All dictionary matches, relative time formatters, DOM parsing, and UI state management run **100% locally on your device**.
+* Translation caches are stored exclusively in your browser's private local storage (`chrome.storage.local`) and never leave your computer.
+
+### 3. API Key & Credential Safety
+* If you configure a custom AI or LLM endpoint (such as OpenAI, Groq, or DeepSeek), your API key is encrypted and stored strictly within your browser's sandboxed extension storage.
+* Your API keys are **never** shared, proxy-routed, or transmitted to any middleman server. All AI requests go directly from your browser to your specified endpoint.
+
+### 4. Third-Party Translation Providers
+* When translating dynamic video titles or user comments that are not in the local dictionary, text strings are sent directly to your chosen translation engine (e.g. Google Web, LibreTranslate, or your custom AI provider) solely to generate the translated text.
+* No personal account credentials, cookies, or Bilibili session tokens are ever attached to translation requests.
+
+### 5. Minimal Permissions
+* `storage`: Required to save user preferences (selected language, theme, engine) and local translation cache.
+* `tabs`: Required only to identify the active hostname for site-specific enable/disable toggling.
+
+---
+
+## 📦 Installation & Setup
+
+### Prerequisites
+* [Node.js](https://nodejs.org/) (version 18 or higher)
+* [npm](https://www.npmjs.com/)
+
+### Build from Source
 ```bash
-# Clone or navigate to the project directory
+# Clone or navigate to the extension repository
 cd scratch/universal-web-translator
 
 # Install dependencies
 npm install
 
-# Build the extension bundle
+# Build production bundle
 npm run build
 ```
 
-The compiled, production-ready unpacked extension will be generated in `dist/`.
-
-### Step 2: Load into Google Chrome / Microsoft Edge / Brave
-1. Open your browser and navigate to:
-   - Chrome: `chrome://extensions`
-   - Edge: `edge://extensions`
-2. Toggle **Developer mode** (top-right corner).
-3. Click **Load unpacked** (top-left).
-4. Select either:
-   - The project folder directly: `universal-web-translator`
-   - Or the `dist/` directory: `universal-web-translator/dist`
-   *(Both directories contain all required bundles, manifests, and assets)*
-5. The **Universal Webpage Translator** icon 🌐 will appear in your browser toolbar!
+### Load Extension in Chrome / Edge / Brave
+1. Open your browser and go to `chrome://extensions`.
+2. Enable **Developer mode** (toggle in the top-right corner).
+3. Click **Load unpacked**.
+4. Select the project directory (`universal-web-translator`).
+5. Pin **Bilibili English** to your toolbar and visit [bilibili.com](https://www.bilibili.com)!
 
 ---
 
-## ⚙️ Provider Configuration
+## 🧪 Testing & Verification
 
-You can configure translation engines and keys anytime in the **Extension Popup** or the **Options Page**:
+Run the automated test suite and end-to-end DOM simulation tests:
 
-### 1. Google Web (Free - Default)
-- Requires **zero configuration** and **no API key**.
-- Supports 100+ languages with automatic source language detection.
-
-### 2. LibreTranslate
-- Default instance: `https://libretranslate.de`
-- Or point to your own local Docker container: `http://localhost:5000`
-- Optional API key supported in Options.
-
-### 3. Custom AI / Ollama / OpenAI
-To use local LLMs (e.g. Ollama with `llama3` or `qwen2.5`) or OpenAI:
-1. Open **Options** (`chrome://extensions` -> Details -> Extension options).
-2. Set **API Endpoint URL**:
-   - Ollama: `http://localhost:11434/v1/chat/completions`
-   - OpenAI: `https://api.openai.com/v1/chat/completions`
-3. Set **Model Name**: `llama3:8b`, `qwen2.5:7b`, or `gpt-4o-mini`.
-4. Enter your API Key (leave empty for local Ollama).
-5. Click **Save Settings**.
-
----
-
-## 🧪 Testing & Bilibili Simulation Testbed
-
-A complete real-world dynamic testbed is included in `test/bilibili-simulation.html`. It simulates:
-- Bilibili Video Player with dynamic playback speed menus (`2.0x`, `1.5x`, `1.25x`, `1.0x 正常`, `0.5x`).
-- Quality dropdown menu (`1080P 60帧 高清`, `720P 高清`, `480P 清晰`, `360P 流畅`).
-- Live Danmaku canvas (filtered to prevent 60fps frame drops).
-- Dynamic User Profile Hover Card (popover appended to `document.body` on hover).
-- Dynamic comment section with infinite-scroll simulation ("加载更多评论").
-- Shadow DOM custom component (`<custom-bili-card>`).
-- Strict Vue 3 / React reactivity counter that throws an error if any child text node is detached or modified destructively.
-
-### Running the Test Server:
 ```bash
-node test/serve.js
+npm test
 ```
-Then visit `http://localhost:4173/test/bilibili-simulation.html` in your browser!
 
-### Running Automated Unit Tests:
-```bash
-npx tsx test/unit-tests.ts
-```
+* Tests cover DOM in-place replacement, text extraction, Vue 3 mutation simulation, dynamic playback speed menus, and local dictionary accuracy.
 
 ---
 
-## 📁 Project Structure
+## 📄 License
 
-```text
-universal-web-translator/
-├── dist/                      # Compiled unpacked Chrome extension
-├── src/
-│   ├── background/            # Background service worker (CORS-free fetch, caching, fallback)
-│   ├── cache/                 # Two-tier L1 memory + L2 persistent storage cache
-│   ├── content/               # Non-destructive overlay, MutationObserver, Floating HUD
-│   ├── providers/             # Google Web, LibreTranslate, MyMemory, Custom AI providers
-│   ├── popup/                 # Sleek dark-mode glassmorphic popup UI
-│   ├── options/               # Advanced settings, API keys, fallback ordering
-│   ├── types/                 # TypeScript interfaces
-│   └── utils/                 # DOM filters, hash utilities, logger
-├── test/
-│   ├── bilibili-simulation.html # Interactive Bilibili DOM testbed
-│   ├── unit-tests.ts          # Automated unit test suite
-│   └── serve.js               # Local test HTTP server
-├── manifest.json              # Chrome Manifest V3 configuration
-├── package.json               # Dependencies and build scripts
-└── build.js                   # Vite programmatic multi-entry builder
-```
-
----
-
-## 🔒 Privacy & Security
-- Content scripts extract only human-readable UI strings, ignoring scripts, styles, codes, and passwords.
-- No personal data or browsing history is tracked or stored.
-- Custom API keys are stored locally on your device in `chrome.storage.local`.
+MIT License. Designed with visual excellence and performance in mind.
