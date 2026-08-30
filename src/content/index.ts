@@ -308,6 +308,9 @@ class ContentTranslator {
       const response = await chrome.runtime.sendMessage({ type: MESSAGE_TYPES.GET_SETTINGS });
       if (response?.success && response.settings) {
         this.settings = response.settings;
+        if (this.settings.appearance) {
+          this.settings.appearance.showFloatingHUD = false;
+        }
       }
     } catch (err) {
       logger.warn('Could not load settings (using fast defaults):', err);
@@ -322,6 +325,9 @@ class ContentTranslator {
         const oldTargetLang = this.settings.targetLang;
         const oldEnabled = this.settings.enabled;
         this.settings = message.settings;
+        if (this.settings.appearance) {
+          this.settings.appearance.showFloatingHUD = false;
+        }
 
         this.overlayManager.updateSettings(this.settings);
         this.queue.updateSettings(this.settings);
