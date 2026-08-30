@@ -46,6 +46,7 @@ class ContentTranslator {
   private readonly BATCH_INTERVAL_MS = 80;
   private readonly MAX_BATCH_SIZE = 30;
   private isTranslating = false;
+  private isDisconnected = false;
 
   constructor() {
     this.textExtractor = new TextExtractor();
@@ -230,9 +231,15 @@ class ContentTranslator {
       this.batchTimer = null;
     }
 
+    if (this.isDisconnected) return;
     if (this.pendingQueue.length === 0) return;
     if (this.isTranslating) {
       this.batchTimer = setTimeout(() => this.flushBatch(), this.BATCH_INTERVAL_MS);
+      return;
+    }
+
+    if (typeof chrome === 'undefined' || !chrome.runtime?.id) {
+      this.handleExtensionInvalidated();
       return;
     }
 
@@ -265,15 +272,30 @@ class ContentTranslator {
         this.floatingHUD.setStatus('Error (Retrying)');
       }
     } catch (err: any) {
+      if (err?.message?.includes('Extension context invalidated') || !chrome.runtime?.id) {
+        this.handleExtensionInvalidated();
+        return;
+      }
       logger.error('Failed to send batch translation to background:', err);
       this.floatingHUD.setStatus('Network error');
     } finally {
       this.isTranslating = false;
-      // If items remain in queue, process next chunk
-      if (this.pendingQueue.length > 0) {
+      if (!this.isDisconnected && this.pendingQueue.length > 0) {
         setTimeout(() => this.flushBatch(), 20);
       }
     }
+  }
+
+  private handleExtensionInvalidated() {
+    this.isDisconnected = true;
+    this.mutationManager.stop();
+    if (this.batchTimer) {
+      clearTimeout(this.batchTimer);
+      this.batchTimer = null;
+    }
+    this.pendingQueue = [];
+    this.floatingHUD.setStatus('Extension reloaded - please refresh');
+    logger.info('Extension was reloaded or updated. Stopped content script observers on stale page.');
   }
 }
 

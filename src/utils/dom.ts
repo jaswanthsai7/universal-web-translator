@@ -47,19 +47,28 @@ export function isElementVisible(el: HTMLElement): boolean {
 /**
  * Checks whether an element or its ancestors should be ignored
  */
-export function isIgnoredElement(el: Element | null): boolean {
-  let current: Element | null = el;
-  while (current) {
-    if (IGNORED_TAGS.has(current.tagName)) return true;
-    if (current.hasAttribute('data-webtrans-ignore')) return true;
-    if (current.id && current.id.startsWith('universal-webtrans-')) return true;
+export function isIgnoredElement(el: Node | Element | null): boolean {
+  if (!el) return false;
+  let current: Node | null = el;
 
-    if (current.className && typeof current.className === 'string') {
-      for (const cls of IGNORED_CLASSES) {
-        if (current.className.includes(cls)) return true;
+  while (current) {
+    if (current.nodeType === Node.ELEMENT_NODE) {
+      const element = current as Element;
+      if (element.tagName && IGNORED_TAGS.has(element.tagName.toUpperCase())) return true;
+      if (typeof element.hasAttribute === 'function' && element.hasAttribute('data-webtrans-ignore')) return true;
+      if (element.id && typeof element.id === 'string' && element.id.startsWith('universal-webtrans-')) return true;
+
+      if (element.className && typeof element.className === 'string') {
+        for (const cls of IGNORED_CLASSES) {
+          if (element.className.includes(cls)) return true;
+        }
       }
+      current = element.parentElement;
+    } else if (current.nodeType === Node.TEXT_NODE || current.nodeType === Node.COMMENT_NODE) {
+      current = current.parentElement;
+    } else {
+      break;
     }
-    current = current.parentElement;
   }
   return false;
 }

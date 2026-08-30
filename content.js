@@ -50,17 +50,25 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
     return true;
   }
   function isIgnoredElement(el) {
+    if (!el) return false;
     let current = el;
     while (current) {
-      if (IGNORED_TAGS.has(current.tagName)) return true;
-      if (current.hasAttribute("data-webtrans-ignore")) return true;
-      if (current.id && current.id.startsWith("universal-webtrans-")) return true;
-      if (current.className && typeof current.className === "string") {
-        for (const cls of IGNORED_CLASSES) {
-          if (current.className.includes(cls)) return true;
+      if (current.nodeType === Node.ELEMENT_NODE) {
+        const element = current;
+        if (element.tagName && IGNORED_TAGS.has(element.tagName.toUpperCase())) return true;
+        if (typeof element.hasAttribute === "function" && element.hasAttribute("data-webtrans-ignore")) return true;
+        if (element.id && typeof element.id === "string" && element.id.startsWith("universal-webtrans-")) return true;
+        if (element.className && typeof element.className === "string") {
+          for (const cls of IGNORED_CLASSES) {
+            if (element.className.includes(cls)) return true;
+          }
         }
+        current = element.parentElement;
+      } else if (current.nodeType === Node.TEXT_NODE || current.nodeType === Node.COMMENT_NODE) {
+        current = current.parentElement;
+      } else {
+        break;
       }
-      current = current.parentElement;
     }
     return false;
   }
@@ -978,6 +986,7 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
       __publicField(this, "BATCH_INTERVAL_MS", 80);
       __publicField(this, "MAX_BATCH_SIZE", 30);
       __publicField(this, "isTranslating", false);
+      __publicField(this, "isDisconnected", false);
       this.textExtractor = new TextExtractor();
       this.overlayManager = new OverlayManager(this.settings);
       this.mutationManager = new MutationManager((mutatedNodes) => {
@@ -1126,13 +1135,19 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
       }
     }
     async flushBatch() {
+      var _a, _b, _c;
       if (this.batchTimer) {
         clearTimeout(this.batchTimer);
         this.batchTimer = null;
       }
+      if (this.isDisconnected) return;
       if (this.pendingQueue.length === 0) return;
       if (this.isTranslating) {
         this.batchTimer = setTimeout(() => this.flushBatch(), this.BATCH_INTERVAL_MS);
+        return;
+      }
+      if (typeof chrome === "undefined" || !((_a = chrome.runtime) == null ? void 0 : _a.id)) {
+        this.handleExtensionInvalidated();
         return;
       }
       const currentBatch = this.pendingQueue.splice(0, this.MAX_BATCH_SIZE);
@@ -1160,14 +1175,29 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
           this.floatingHUD.setStatus("Error (Retrying)");
         }
       } catch (err) {
+        if (((_b = err == null ? void 0 : err.message) == null ? void 0 : _b.includes("Extension context invalidated")) || !((_c = chrome.runtime) == null ? void 0 : _c.id)) {
+          this.handleExtensionInvalidated();
+          return;
+        }
         logger.error("Failed to send batch translation to background:", err);
         this.floatingHUD.setStatus("Network error");
       } finally {
         this.isTranslating = false;
-        if (this.pendingQueue.length > 0) {
+        if (!this.isDisconnected && this.pendingQueue.length > 0) {
           setTimeout(() => this.flushBatch(), 20);
         }
       }
+    }
+    handleExtensionInvalidated() {
+      this.isDisconnected = true;
+      this.mutationManager.stop();
+      if (this.batchTimer) {
+        clearTimeout(this.batchTimer);
+        this.batchTimer = null;
+      }
+      this.pendingQueue = [];
+      this.floatingHUD.setStatus("Extension reloaded - please refresh");
+      logger.info("Extension was reloaded or updated. Stopped content script observers on stale page.");
     }
   }
   if (document.readyState === "loading") {
