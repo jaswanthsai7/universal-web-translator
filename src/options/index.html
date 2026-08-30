@@ -3,143 +3,180 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Universal Web Translator - Options</title>
+  <title>Bilibili English - Settings</title>
   <link rel="stylesheet" href="options.css">
 </head>
 <body>
-  <div class="options-layout">
-    <aside class="sidebar">
-      <div class="sidebar-brand">
-        <span class="logo">🌐</span>
-        <h2>Translator Settings</h2>
-      </div>
-      <nav class="nav-links">
-        <a href="#section-providers" class="nav-item active">Translation Engines</a>
-        <a href="#section-custom-api" class="nav-item">Custom AI / LLM</a>
-        <a href="#section-appearance" class="nav-item">Appearance & Overlay</a>
-        <a href="#section-sites" class="nav-item">Domain Management</a>
-      </nav>
-    </aside>
-
-    <main class="content">
-      <header class="content-header">
-        <h1>Preferences & Engine Configuration</h1>
-        <p>Configure custom translation providers, non-destructive overlay styles, and dynamic page rules.</p>
-      </header>
-
-      <!-- Section: Translation Engines & Fallback -->
-      <section id="section-providers" class="card">
-        <h2>Engine Hierarchy & Fallback Chain</h2>
-        <p class="card-desc">If the primary provider faces rate limits or network issues, the fallback providers are automatically tried without disrupting the user.</p>
-
-        <div class="form-grid">
-          <div class="field">
-            <label for="primary-provider">Primary Engine</label>
-            <select id="primary-provider" class="input">
-              <option value="google">Google Web (Free / High Reliability)</option>
-              <option value="libretranslate">LibreTranslate (Open Source)</option>
-              <option value="mymemory">MyMemory (Free Public)</option>
-              <option value="custom">Custom AI / LLM API</option>
-            </select>
-          </div>
-
-          <div class="field">
-            <label for="fallback-1">Fallback Engine 1</label>
-            <select id="fallback-1" class="input">
-              <option value="libretranslate">LibreTranslate (Open Source)</option>
-              <option value="google">Google Web</option>
-              <option value="mymemory">MyMemory</option>
-              <option value="none">None</option>
-            </select>
-          </div>
-
-          <div class="field">
-            <label for="fallback-2">Fallback Engine 2</label>
-            <select id="fallback-2" class="input">
-              <option value="mymemory">MyMemory (Free Public)</option>
-              <option value="google">Google Web</option>
-              <option value="libretranslate">LibreTranslate</option>
-              <option value="none">None</option>
-            </select>
+  <div class="app-shell">
+    <div class="settings-container">
+      <!-- Sidebar Navigation -->
+      <aside class="settings-sidebar">
+        <div class="brand-badge">
+          <img src="icons/icon48.png" alt="Bilibili English" class="brand-img" width="32" height="32">
+          <div>
+            <h1 class="brand-name">Bilibili English</h1>
+            <span class="brand-tag">Settings & Preferences</span>
           </div>
         </div>
-      </section>
 
-      <!-- Section: Custom AI / LLM -->
-      <section id="section-custom-api" class="card">
-        <h2>Custom API / Local LLM (Ollama, OpenAI, DeepSeek)</h2>
-        <p class="card-desc">Connect your own OpenAI-compatible endpoint or local Ollama instance for translations.</p>
+        <nav class="tab-nav">
+          <button type="button" class="tab-btn active" data-tab="tab-engines">
+            <span class="tab-icon">⚡</span>
+            <span>Translation Engines</span>
+          </button>
+          <button type="button" class="tab-btn" data-tab="tab-ai">
+            <span class="tab-icon">🤖</span>
+            <span>Custom AI & LLMs</span>
+          </button>
+          <button type="button" class="tab-btn" data-tab="tab-appearance">
+            <span class="tab-icon">🎨</span>
+            <span>Appearance & Style</span>
+          </button>
+          <button type="button" class="tab-btn" data-tab="tab-domains">
+            <span class="tab-icon">🌐</span>
+            <span>Domain Rules</span>
+          </button>
+        </nav>
 
-        <div class="form-stack">
-          <div class="field">
-            <label for="custom-api-url">API Endpoint URL</label>
-            <input type="url" id="custom-api-url" class="input" placeholder="https://api.openai.com/v1/chat/completions or http://localhost:11434/v1/chat/completions">
-            <span class="help-text">Compatible with OpenAI, Ollama, Groq, DeepSeek, and LocalAI.</span>
-          </div>
+        <div class="sidebar-footer">
+          <span class="version-label">v1.0.0 • Manifest V3</span>
+        </div>
+      </aside>
 
-          <div class="field">
-            <label for="custom-api-key">API Key (Bearer Token)</label>
-            <input type="password" id="custom-api-key" class="input" placeholder="sk-...">
-            <span class="help-text">Stored securely in local browser storage. Leave empty for local Ollama.</span>
-          </div>
+      <!-- Main Content Tabs -->
+      <main class="settings-main">
+        <!-- Tab 1: Translation Engines -->
+        <div class="tab-panel active" id="tab-engines">
+          <header class="panel-header">
+            <h2>Translation Engines</h2>
+            <p>Configure primary translation engines and automatic fallback priority.</p>
+          </header>
 
-          <div class="field">
-            <label for="custom-api-model">Model Name</label>
-            <input type="text" id="custom-api-model" class="input" placeholder="gpt-4o-mini or llama3:8b">
+          <div class="settings-card">
+            <div class="setting-group">
+              <label for="primary-provider" class="setting-label">Primary Engine</label>
+              <p class="setting-desc">Main provider used for on-page text and dynamic element translation.</p>
+              <select id="primary-provider" class="clean-select">
+                <option value="google">Google Web (Free / High Reliability / Instant)</option>
+                <option value="libretranslate">LibreTranslate (Open Source API)</option>
+                <option value="mymemory">MyMemory (Free Public Translation API)</option>
+                <option value="custom">Custom AI / OpenAI / Ollama Endpoint</option>
+              </select>
+            </div>
+
+            <div class="setting-group">
+              <label for="fallback-1" class="setting-label">First Fallback Engine</label>
+              <p class="setting-desc">Automatically invoked if the primary provider hits a rate limit or timeout.</p>
+              <select id="fallback-1" class="clean-select">
+                <option value="libretranslate">LibreTranslate (Open Source)</option>
+                <option value="google">Google Web</option>
+                <option value="mymemory">MyMemory (Public API)</option>
+                <option value="none">None (Disabled)</option>
+              </select>
+            </div>
+
+            <div class="setting-group">
+              <label for="fallback-2" class="setting-label">Second Fallback Engine</label>
+              <p class="setting-desc">Final safety provider if both previous engines fail.</p>
+              <select id="fallback-2" class="clean-select">
+                <option value="mymemory">MyMemory (Public API)</option>
+                <option value="google">Google Web</option>
+                <option value="libretranslate">LibreTranslate</option>
+                <option value="none">None (Disabled)</option>
+              </select>
+            </div>
           </div>
         </div>
-      </section>
 
-      <!-- Section: Appearance -->
-      <section id="section-appearance" class="card">
-        <h2>Visual Layer & Overlay Appearance</h2>
-        <p class="card-desc">Customize how translations appear above original text on dynamic pages.</p>
+        <!-- Tab 2: Custom AI & LLMs -->
+        <div class="tab-panel" id="tab-ai">
+          <header class="panel-header">
+            <h2>Custom AI & Local LLM</h2>
+            <p>Connect any OpenAI-compatible API (Ollama, OpenAI, Groq, DeepSeek, or vLLM).</p>
+          </header>
 
-        <div class="form-grid">
-          <div class="field">
-            <label for="font-size">Font Size (<span id="font-size-val">13</span>px)</label>
-            <input type="range" id="font-size" min="10" max="18" value="13" class="slider-input">
-          </div>
+          <div class="settings-card">
+            <div class="setting-group">
+              <label for="custom-api-url" class="setting-label">API Endpoint URL</label>
+              <input type="url" id="custom-api-url" class="clean-input" placeholder="https://api.openai.com/v1/chat/completions or http://localhost:11434/v1/chat/completions">
+              <span class="setting-hint">Compatible with Ollama, OpenAI, Groq, DeepSeek, and LocalAI.</span>
+            </div>
 
-          <div class="field">
-            <label for="opacity">Overlay Opacity (<span id="opacity-val">95</span>%)</label>
-            <input type="range" id="opacity" min="40" max="100" value="95" class="slider-input">
-          </div>
+            <div class="setting-group">
+              <label for="custom-api-key" class="setting-label">API Secret Key (Bearer Token)</label>
+              <input type="password" id="custom-api-key" class="clean-input" placeholder="sk-...">
+              <span class="setting-hint">Stored locally on your device. Leave blank for local Ollama instances.</span>
+            </div>
 
-          <div class="field">
-            <label for="theme-select">Visual Theme</label>
-            <select id="theme-select" class="input">
-              <option value="glass-dark">Glassmorphism Dark (Recommended)</option>
-              <option value="glass-light">Glassmorphism Light</option>
-              <option value="subtle">Subtle Minimal</option>
-              <option value="vibrant">High Contrast Vibrant</option>
-            </select>
-          </div>
-
-          <div class="field checkbox-field">
-            <label class="toggle-control">
-              <input type="checkbox" id="show-hud" checked>
-              <span>Show On-Page Floating Control HUD</span>
-            </label>
+            <div class="setting-group">
+              <label for="custom-api-model" class="setting-label">Model Identifier</label>
+              <input type="text" id="custom-api-model" class="clean-input" placeholder="gpt-4o-mini, llama3:8b, or qwen2.5:7b">
+              <span class="setting-hint">Target model to query for contextual translation.</span>
+            </div>
           </div>
         </div>
-      </section>
 
-      <!-- Section: Per-site Domains -->
-      <section id="section-sites" class="card">
-        <h2>Domain Settings</h2>
-        <p class="card-desc">Enable or disable translation on specific domains.</p>
-        <div id="site-rules-container" class="site-rules-list">
-          <p class="empty-text">No custom domain overrides set. Translation is active on all supported sites.</p>
+        <!-- Tab 3: Appearance & Style -->
+        <div class="tab-panel" id="tab-appearance">
+          <header class="panel-header">
+            <h2>Appearance & Display</h2>
+            <p>Customize typography and theme preferences.</p>
+          </header>
+
+          <div class="settings-card">
+            <div class="setting-group">
+              <label for="theme-select" class="setting-label">Color Scheme</label>
+              <p class="setting-desc">Choose between dark, light, or automatic system preference matching.</p>
+              <select id="theme-select" class="clean-select">
+                <option value="auto">Auto (Match System / Browser Theme)</option>
+                <option value="light">Light Mode (Clean White)</option>
+                <option value="glass-dark">Dark Mode (Obsidian Slate)</option>
+              </select>
+            </div>
+
+            <div class="setting-group">
+              <label for="font-size" class="setting-label">Font Size (<span id="font-size-val">13</span>px)</label>
+              <input type="range" id="font-size" class="clean-slider" min="11" max="18" value="13">
+            </div>
+
+            <div class="setting-group">
+              <label for="opacity" class="setting-label">Dual Mode Text Opacity (<span id="opacity-val">95</span>%)</label>
+              <input type="range" id="opacity" class="clean-slider" min="50" max="100" value="95">
+            </div>
+
+            <div class="setting-group">
+              <label class="toggle-row">
+                <input type="checkbox" id="show-hud">
+                <div>
+                  <span class="toggle-title">Show Floating Status Pill</span>
+                  <p class="toggle-desc">Display a small floating status badge in the bottom-right corner of webpages (disabled by default).</p>
+                </div>
+              </label>
+            </div>
+          </div>
         </div>
-      </section>
 
-      <!-- Action Footer -->
-      <div class="actions-bar">
-        <button id="btn-save" class="btn btn-save">Save Settings</button>
-        <span id="save-status" class="save-status"></span>
-      </div>
-    </main>
+        <!-- Tab 4: Domain Rules -->
+        <div class="tab-panel" id="tab-domains">
+          <header class="panel-header">
+            <h2>Domain Rules & Overrides</h2>
+            <p>Manage domain-specific activation rules.</p>
+          </header>
+
+          <div class="settings-card">
+            <div id="site-rules-container" class="domain-list">
+              <!-- Dynamically populated -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Bottom Save Action Bar -->
+        <div class="save-bar">
+          <span id="save-status" class="save-status"></span>
+          <button type="button" id="btn-save" class="btn-save">Save Changes</button>
+        </div>
+      </main>
+    </div>
   </div>
 
   <script type="module" src="./options.ts"></script>

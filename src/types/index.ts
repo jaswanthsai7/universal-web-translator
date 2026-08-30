@@ -2,6 +2,9 @@ export type ProviderType = 'google' | 'libretranslate' | 'mymemory' | 'custom';
 
 export type TranslationMode = 'translated-only' | 'dual' | 'hover';
 
+/** Distinguishes how a translation target was sourced */
+export type TargetType = 'text' | 'attribute' | 'css-before' | 'css-after';
+
 export interface TranslationResult {
   sourceText: string;
   translatedText: string;
@@ -21,11 +24,13 @@ export interface TranslationProvider {
 }
 
 export interface AppearanceSettings {
-  fontSize: number; // e.g. 12 (px)
-  opacity: number; // 0.1 - 1.0
+  fontSize: number;         // e.g. 12 (px)
+  opacity: number;          // 0.1 – 1.0
   theme: 'glass-dark' | 'glass-light' | 'subtle' | 'vibrant';
   showFloatingHUD: boolean;
   showOriginalOnHover: boolean;
+  /** Max simultaneous translation requests. Default: 3. Lower on free APIs to avoid rate-limits. */
+  concurrency: number;
 }
 
 export interface SiteConfig {
@@ -36,7 +41,7 @@ export interface SiteConfig {
 
 export interface TranslatorSettings {
   enabled: boolean;
-  sourceLang: string; // 'auto' or code
+  sourceLang: string; // 'auto' or BCP-47 code
   targetLang: string; // 'en', 'zh', 'ja', etc.
   provider: ProviderType;
   fallbackChain: ProviderType[];
@@ -93,10 +98,13 @@ export interface BatchTranslationResponseMessage {
 
 export interface TextExtractTarget {
   node: Node;
-  type: 'text' | 'attribute';
+  /** How the target was sourced */
+  type: TargetType;
   attributeName?: string;
   originalText: string;
   translatedText?: string;
   element: HTMLElement;
   overlayElement?: HTMLElement;
+  /** Scan priority: 0 = visible viewport, 1 = near-viewport, 2 = offscreen */
+  priority?: 0 | 1 | 2;
 }

@@ -2,6 +2,7 @@ import { isIgnoredElement } from '../utils/dom';
 import { logger } from '../utils/logger';
 
 export type MutationCallback = (mutatedNodes: Node[]) => void;
+export type SelfMutationChecker = (node: Node, value: string) => boolean;
 
 export class MutationManager {
   private observer: MutationObserver | null = null;
@@ -10,11 +11,13 @@ export class MutationManager {
   private debounceTimer: any = null;
   private readonly debounceMs = 60;
   private callback: MutationCallback;
+  private isSelfMutation?: SelfMutationChecker;
   private isPaused = false;
   private lastUrl = '';
 
-  constructor(callback: MutationCallback) {
+  constructor(callback: MutationCallback, isSelfMutation?: SelfMutationChecker) {
     this.callback = callback;
+    this.isSelfMutation = isSelfMutation;
     this.lastUrl = window.location.href;
     this.setupUrlWatcher();
   }
@@ -32,8 +35,9 @@ export class MutationManager {
       this.observer.observe(target, {
         childList: true,
         subtree: true,
+        characterData: true,
         attributes: true,
-        attributeFilter: ['style', 'class', 'aria-expanded', 'hidden'],
+        attributeFilter: ['style', 'class', 'aria-expanded', 'hidden', 'placeholder', 'title', 'aria-label', 'alt'],
       });
       logger.info('MutationObserver started listening on DOM');
     }
@@ -87,6 +91,19 @@ export class MutationManager {
           // Check if newly added element has shadow root
           if (node instanceof Element) {
             this.scanShadowRoots(node);
+          }
+        }
+      } else if (mut.type === 'characterData') {
+        const textNode = mut.target;
+        if (textNode && textNode.nodeType === Node.TEXT_NODE) {
+          const val = textNode.nodeValue || '';
+          if (this.isSelfMutation && this.isSelfMutation(textNode, val)) {
+            // Our own injected translation, ignore!
+            continue;
+          }
+          if (textNode.parentElement && !isIgnoredElement(textNode.parentElement)) {
+            this.pendingNodes.add(textNode);
+            hasRelevantMutations = true;
           }
         }
       } else if (mut.type === 'attributes') {

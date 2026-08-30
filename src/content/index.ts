@@ -2,129 +2,301 @@ import {
   TranslatorSettings,
   MESSAGE_TYPES,
   TextExtractTarget,
-  BatchTranslationRequestMessage,
-  BatchTranslationResponseMessage,
 } from '../types';
 import { TextExtractor } from './textExtractor';
 import { OverlayManager } from './overlayManager';
 import { MutationManager } from './mutationManager';
+import { TranslationQueue } from './translationQueue';
+import { ScannerWorker } from './scannerWorker';
 import { FloatingHUD } from './floatingHUD';
+import { getLocalTranslation } from '../utils/localTranslator';
 import { logger } from '../utils/logger';
 
-class ContentTranslator {
-  private settings: TranslatorSettings = {
-    enabled: true,
-    sourceLang: 'auto',
-    targetLang: 'en',
-    provider: 'google',
-    fallbackChain: ['google', 'libretranslate', 'mymemory'],
-    mode: 'translated-only',
-    translateDynamic: true,
-    translatePopups: true,
-    translateTooltips: true,
-    translatePlaceholders: true,
-    customApiUrl: '',
-    customApiKey: '',
-    customApiModel: '',
-    siteSettings: {},
-    appearance: {
-      fontSize: 13,
-      opacity: 0.95,
-      theme: 'glass-dark',
-      showFloatingHUD: true,
-      showOriginalOnHover: true,
-    },
-  };
+/**
+ * Fast default settings — used synchronously before settings load from storage.
+ * Ensures translation can begin immediately with sensible defaults,
+ * even before the async settings response arrives.
+ */
+const FAST_DEFAULTS: TranslatorSettings = {
+  enabled: true,
+  sourceLang: 'auto',
+  targetLang: 'en',
+  provider: 'google',
+  fallbackChain: ['google', 'libretranslate', 'mymemory'],
+  mode: 'translated-only',
+  translateDynamic: true,
+  translatePopups: true,
+  translateTooltips: true,
+  translatePlaceholders: true,
+  customApiUrl: '',
+  customApiKey: '',
+  customApiModel: '',
+  siteSettings: {},
+  appearance: {
+    fontSize: 13,
+    opacity: 0.95,
+    theme: 'glass-dark',
+    showFloatingHUD: false,
+    showOriginalOnHover: true,
+    concurrency: 3,
+  },
+};
 
-  private textExtractor: TextExtractor;
-  private overlayManager: OverlayManager;
-  private mutationManager: MutationManager;
+class ContentTranslator {
+  private settings: TranslatorSettings = { ...FAST_DEFAULTS };
+
+  private readonly textExtractor: TextExtractor;
+  private readonly overlayManager: OverlayManager;
+  private readonly mutationManager: MutationManager;
+  private readonly scannerWorker: ScannerWorker;
+  private readonly queue: TranslationQueue;
   private floatingHUD: FloatingHUD;
 
-  private pendingQueue: TextExtractTarget[] = [];
-  private batchTimer: any = null;
-  private readonly BATCH_INTERVAL_MS = 80;
-  private readonly MAX_BATCH_SIZE = 30;
-  private isTranslating = false;
   private isDisconnected = false;
 
   constructor() {
     this.textExtractor = new TextExtractor();
     this.overlayManager = new OverlayManager(this.settings);
 
-    this.mutationManager = new MutationManager((mutatedNodes) => {
-      if (!this.isCurrentSiteEnabled()) return;
-      if (!this.settings.translateDynamic) return;
+    // ─────────────────────────────────────────────────────────────────────
+    // Create the TranslationQueue — passes translations to the overlay
+    // ─────────────────────────────────────────────────────────────────────
+    this.queue = new TranslationQueue(
+      this.settings,
+      (target, translatedText) => {
+        this.overlayManager.applyTranslation(target, translatedText);
+      },
+      (req) => this.sendMessage(req),
+    );
 
-      this.processMutatedNodes(mutatedNodes);
-    });
+    // ─────────────────────────────────────────────────────────────────────
+    // Chunked background scanner — feeds TranslationQueue
+    // ─────────────────────────────────────────────────────────────────────
+    this.scannerWorker = new ScannerWorker(
+      this.textExtractor,
+      this.settings,
+      (targets, priority) => this.enqueueWithPriority(targets, priority),
+    );
 
+    // ─────────────────────────────────────────────────────────────────────
+    // MutationObserver — start IMMEDIATELY (document_start: no body yet)
+    // Captures every DOM insertion from the first parsed byte onwards.
+    // ─────────────────────────────────────────────────────────────────────
+    this.mutationManager = new MutationManager(
+      (mutatedNodes) => {
+        if (!this.isCurrentSiteEnabled()) return;
+        if (!this.settings.translateDynamic) return;
+        this.processMutatedNodes(mutatedNodes);
+      },
+      (node, val) => this.overlayManager.isSelfMutation(node, val),
+    );
+    this.mutationManager.start(); // Attaches to documentElement, works before body
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Floating HUD (deferred — needs document.body)
+    // ─────────────────────────────────────────────────────────────────────
     this.floatingHUD = new FloatingHUD(this.settings, {
-      onToggleEnabled: (enabled) => {
-        this.saveSettings({ enabled });
-      },
-      onChangeMode: (mode) => {
-        this.saveSettings({ mode });
-      },
+      onToggleEnabled: (enabled) => this.saveSettings({ enabled }),
+      onChangeMode: (mode) => this.saveSettings({ mode }),
       onChangeTargetLang: (targetLang) => {
         this.saveSettings({ targetLang });
         this.retranslateAll();
       },
-      onTranslateCurrentPage: () => {
-        this.translateEntirePage();
-      },
+      onTranslateCurrentPage: () => this.fullPageScan(),
     });
 
-    this.init();
+    // ─────────────────────────────────────────────────────────────────────
+    // Boot sequence (async, non-blocking)
+    // ─────────────────────────────────────────────────────────────────────
+    this.boot();
   }
 
-  private async init() {
-    await this.loadSettings();
+  // ── Boot sequence ────────────────────────────────────────────────────
 
-    if (!this.isCurrentSiteEnabled()) {
-      logger.info(`Translation disabled for domain: ${window.location.hostname}`);
-      this.floatingHUD.setStatus('Disabled for site');
-      return;
+  private async boot() {
+    // Start settings load in background — don't await it before scanning
+    const settingsPromise = this.loadSettings();
+
+    // When body is available, start the page scan immediately
+    const startScan = () => {
+      if (!this.isCurrentSiteEnabled()) {
+        this.floatingHUD.setStatus('Disabled for site');
+        return;
+      }
+
+      // P0: Immediate scan of visible viewport — no settings needed for this
+      this.immediateViewportScan();
+
+      // Full prioritized background scan (continues while P0 translations are in-flight)
+      this.fullPageScan();
+
+      this.setupListeners();
+    };
+
+    if (document.body) {
+      startScan();
+    } else {
+      document.addEventListener('DOMContentLoaded', startScan, { once: true });
     }
 
-    this.setupListeners();
-    this.mutationManager.start();
+    // Once settings load, update queue/overlay settings and potentially re-check
+    settingsPromise.then(() => {
+      this.queue.updateSettings(this.settings);
+      this.overlayManager.updateSettings(this.settings);
+      this.scannerWorker.updateSettings(this.settings);
+      this.floatingHUD.updateSettings(this.settings);
 
-    // Start translating current page
-    if (this.settings.enabled) {
-      this.translateEntirePage();
+      // If site is disabled per settings, clear any in-progress work
+      if (!this.isCurrentSiteEnabled()) {
+        this.queue.reset();
+        this.overlayManager.clear();
+        this.floatingHUD.setStatus('Disabled for site');
+      }
+    });
+  }
+
+  // ── Immediate above-the-fold scan ─────────────────────────────────────
+
+  /**
+   * Synchronously extracts text from the first ~100 elements in the document.
+   * These are almost always above the fold. Runs immediately after DOMContentLoaded
+   * without waiting for settings to return from storage.
+   */
+  private immediateViewportScan() {
+    const root = document.body ?? document.documentElement;
+    if (!root) return;
+
+    const candidates = root.querySelectorAll<HTMLElement>('*');
+    const limit = Math.min(candidates.length, 150);
+    const targets: TextExtractTarget[] = [];
+
+    for (let i = 0; i < limit; i++) {
+      const el = candidates[i];
+      const extracted = this.textExtractor.extractFromRoot(el, this.settings);
+      for (const t of extracted) { t.priority = 0; targets.push(t); }
+    }
+
+    if (targets.length > 0) {
+      logger.info(`Immediate viewport scan: ${targets.length} targets discovered`);
+      this.dispatchTargets(targets);
+      this.floatingHUD.setStatus('Active');
     }
   }
 
-  private isCurrentSiteEnabled(): boolean {
-    if (!this.settings.enabled) return false;
-    const hostname = window.location.hostname;
-    const siteConfig = this.settings.siteSettings[hostname];
-    if (siteConfig && siteConfig.enabled === false) {
-      return false;
+  // ── Full background page scan ─────────────────────────────────────────
+
+  fullPageScan() {
+    if (!this.isCurrentSiteEnabled()) return;
+    const root = document.body ?? document.documentElement;
+    if (!root) return;
+
+    this.floatingHUD.setStatus('Scanning…', true);
+    this.scannerWorker.scan(root).then(() => {
+      this.floatingHUD.setStatus('Active');
+    });
+  }
+
+  // ── Dynamic mutation handling ─────────────────────────────────────────
+
+  private processMutatedNodes(nodes: Node[]) {
+    if (!this.isCurrentSiteEnabled()) return;
+
+    const targets: TextExtractTarget[] = [];
+    for (const node of nodes) {
+      const extracted = this.textExtractor.extractFromRoot(node, this.settings);
+      targets.push(...extracted);
     }
-    return true;
+
+    if (targets.length > 0) {
+      logger.debug(`Dynamic: ${targets.length} targets from mutations`);
+      this.dispatchTargets(targets);
+    }
+  }
+
+  // ── Priority-aware enqueue ────────────────────────────────────────────
+
+  private enqueueWithPriority(targets: TextExtractTarget[], priority: 0 | 1 | 2) {
+    for (const t of targets) t.priority = priority;
+    this.dispatchTargets(targets);
+  }
+
+  /**
+   * Dispatches discovered targets:
+   * 1. Checks local dictionary for instant 0ms translation (UI terms, buttons, categories)
+   * 2. Routes uncached targets to TranslationQueue for batched background translation
+   */
+  private dispatchTargets(targets: TextExtractTarget[]) {
+    if (!targets.length) return;
+    const uncached: TextExtractTarget[] = [];
+
+    for (const target of targets) {
+      const local = getLocalTranslation(target.originalText, this.settings.targetLang);
+      if (local) {
+        // Instant 0ms synchronous in-place translation!
+        this.overlayManager.applyTranslation(target, local);
+      } else {
+        uncached.push(target);
+      }
+    }
+
+    if (uncached.length > 0) {
+      this.queue.enqueue(uncached);
+    }
+  }
+
+  // ── Re-translate (language change, settings change) ───────────────────
+
+  retranslateAll() {
+    this.overlayManager.clear();
+    this.textExtractor.reset();
+    this.queue.reset();
+    this.scannerWorker.abort();
+    this.fullPageScan();
+  }
+
+  // ── Chrome messaging ──────────────────────────────────────────────────
+
+  private async sendMessage(req: any): Promise<any> {
+    if (this.isDisconnected) throw new Error('Extension context invalidated');
+
+    // Pre-flight: runtime.id disappears the moment the extension is invalidated
+    if (typeof chrome === 'undefined' || !chrome?.runtime?.id) {
+      this.handleExtensionInvalidated();
+      throw new Error('Extension context invalidated');
+    }
+
+    try {
+      return await chrome.runtime.sendMessage(req);
+    } catch (err: any) {
+      const msg = (err?.message ?? '').toLowerCase();
+      const isContextGone =
+        msg.includes('extension context') ||
+        msg.includes('could not establish connection') ||
+        msg.includes('receiving end does not exist') ||
+        msg.includes('message channel was closed') ||
+        !chrome?.runtime?.id;
+
+      if (isContextGone) {
+        this.handleExtensionInvalidated();
+      }
+      throw err; // Re-throw so TranslationQueue's catch also handles it
+    }
   }
 
   private async loadSettings() {
-    if (typeof chrome === 'undefined' || !chrome.runtime || !chrome.runtime.sendMessage) return;
-
+    if (typeof chrome === 'undefined' || !chrome.runtime?.sendMessage) return;
     try {
-      const response = await chrome.runtime.sendMessage({
-        type: MESSAGE_TYPES.GET_SETTINGS,
-      });
-      if (response && response.success && response.settings) {
+      const response = await chrome.runtime.sendMessage({ type: MESSAGE_TYPES.GET_SETTINGS });
+      if (response?.success && response.settings) {
         this.settings = response.settings;
-        this.overlayManager.updateSettings(this.settings);
-        this.floatingHUD.updateSettings(this.settings);
       }
     } catch (err) {
-      logger.warn('Failed to load settings in content script:', err);
+      logger.warn('Could not load settings (using fast defaults):', err);
     }
   }
 
   private setupListeners() {
-    if (typeof chrome === 'undefined' || !chrome.runtime || !chrome.runtime.onMessage) return;
+    if (typeof chrome === 'undefined' || !chrome.runtime?.onMessage) return;
 
     chrome.runtime.onMessage.addListener((message) => {
       if (message.type === MESSAGE_TYPES.SETTINGS_CHANGED && message.settings) {
@@ -133,9 +305,12 @@ class ContentTranslator {
         this.settings = message.settings;
 
         this.overlayManager.updateSettings(this.settings);
+        this.queue.updateSettings(this.settings);
+        this.scannerWorker.updateSettings(this.settings);
         this.floatingHUD.updateSettings(this.settings);
 
         if (!this.settings.enabled) {
+          this.queue.reset();
           this.overlayManager.clear();
           this.mutationManager.pause();
           this.floatingHUD.setStatus('Paused');
@@ -152,16 +327,18 @@ class ContentTranslator {
   private async saveSettings(newSettings: Partial<TranslatorSettings>) {
     this.settings = { ...this.settings, ...newSettings };
     this.overlayManager.updateSettings(this.settings);
+    this.queue.updateSettings(this.settings);
     this.floatingHUD.updateSettings(this.settings);
 
-    if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+    if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
       chrome.runtime.sendMessage({
         type: MESSAGE_TYPES.SAVE_SETTINGS,
         settings: this.settings,
-      });
+      }).catch(() => {});
     }
 
     if (!this.settings.enabled) {
+      this.queue.reset();
       this.overlayManager.clear();
       this.mutationManager.pause();
       this.floatingHUD.setStatus('Paused');
@@ -170,138 +347,33 @@ class ContentTranslator {
     }
   }
 
-  /**
-   * Scan and translate entire document
-   */
-  translateEntirePage() {
-    if (!this.isCurrentSiteEnabled()) return;
-
-    this.floatingHUD.setStatus('Scanning...', true);
-    const root = document.body || document.documentElement;
-    const targets = this.textExtractor.extractFromRoot(root, this.settings);
-    logger.info(`Extracted ${targets.length} initial translatable items`);
-
-    this.enqueueTargets(targets);
+  private isCurrentSiteEnabled(): boolean {
+    if (!this.settings.enabled) return false;
+    const hostname = window.location.hostname;
+    const siteConfig = this.settings.siteSettings[hostname];
+    if (siteConfig?.enabled === false) return false;
+    return true;
   }
 
-  /**
-   * Clears existing translations and re-scans the DOM (e.g. when changing target language)
-   */
-  retranslateAll() {
-    this.overlayManager.clear();
-    this.textExtractor.reset();
-    this.translateEntirePage();
-  }
-
-  /**
-   * Handle dynamically added nodes from MutationObserver
-   */
-  private processMutatedNodes(nodes: Node[]) {
-    if (!this.isCurrentSiteEnabled()) return;
-
-    let targets: TextExtractTarget[] = [];
-    for (const node of nodes) {
-      const extracted = this.textExtractor.extractFromRoot(node, this.settings);
-      targets.push(...extracted);
-    }
-
-    if (targets.length > 0) {
-      logger.debug(`Extracted ${targets.length} items from dynamic mutations`);
-      this.enqueueTargets(targets);
-    }
-  }
-
-  private enqueueTargets(targets: TextExtractTarget[]) {
-    if (targets.length === 0) return;
-    this.pendingQueue.push(...targets);
-
-    if (this.pendingQueue.length >= this.MAX_BATCH_SIZE) {
-      this.flushBatch();
-    } else if (!this.batchTimer) {
-      this.batchTimer = setTimeout(() => {
-        this.batchTimer = null;
-        this.flushBatch();
-      }, this.BATCH_INTERVAL_MS);
-    }
-  }
-
-  private async flushBatch() {
-    if (this.batchTimer) {
-      clearTimeout(this.batchTimer);
-      this.batchTimer = null;
-    }
-
-    if (this.isDisconnected) return;
-    if (this.pendingQueue.length === 0) return;
-    if (this.isTranslating) {
-      this.batchTimer = setTimeout(() => this.flushBatch(), this.BATCH_INTERVAL_MS);
-      return;
-    }
-
-    if (typeof chrome === 'undefined' || !chrome.runtime?.id) {
-      this.handleExtensionInvalidated();
-      return;
-    }
-
-    const currentBatch = this.pendingQueue.splice(0, this.MAX_BATCH_SIZE);
-    const texts = currentBatch.map((t) => t.originalText);
-
-    this.floatingHUD.setStatus('Translating...', true);
-    this.isTranslating = true;
-
-    try {
-      const req: BatchTranslationRequestMessage = {
-        type: MESSAGE_TYPES.TRANSLATE_BATCH,
-        texts,
-        sourceLang: this.settings.sourceLang,
-        targetLang: this.settings.targetLang,
-      };
-
-      const res: BatchTranslationResponseMessage = await chrome.runtime.sendMessage(req);
-
-      if (res && res.success && res.translations) {
-        for (let i = 0; i < currentBatch.length; i++) {
-          const trans = res.translations[i];
-          if (trans) {
-            this.overlayManager.applyTranslation(currentBatch[i], trans);
-          }
-        }
-        this.floatingHUD.setStatus('Active');
-      } else {
-        logger.warn('Batch translation response error:', res?.error);
-        this.floatingHUD.setStatus('Error (Retrying)');
-      }
-    } catch (err: any) {
-      if (err?.message?.includes('Extension context invalidated') || !chrome.runtime?.id) {
-        this.handleExtensionInvalidated();
-        return;
-      }
-      logger.error('Failed to send batch translation to background:', err);
-      this.floatingHUD.setStatus('Network error');
-    } finally {
-      this.isTranslating = false;
-      if (!this.isDisconnected && this.pendingQueue.length > 0) {
-        setTimeout(() => this.flushBatch(), 20);
-      }
-    }
-  }
+  // ── Extension context invalidation ────────────────────────────────────
 
   private handleExtensionInvalidated() {
     this.isDisconnected = true;
     this.mutationManager.stop();
-    if (this.batchTimer) {
-      clearTimeout(this.batchTimer);
-      this.batchTimer = null;
-    }
-    this.pendingQueue = [];
-    this.floatingHUD.setStatus('Extension reloaded - please refresh');
-    logger.info('Extension was reloaded or updated. Stopped content script observers on stale page.');
+    this.queue.invalidate();
+    this.scannerWorker.abort();
+    this.floatingHUD.setStatus('Extension reloaded — please refresh');
+    logger.info('Extension invalidated. Content script stopped.');
   }
 }
 
-// Instantiate content translator when DOM is interactive or complete
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => new ContentTranslator());
-} else {
+// ─────────────────────────────────────────────────────────────────────────────
+// Bootstrap — runs at document_start (before DOM is fully parsed)
+// ─────────────────────────────────────────────────────────────────────────────
+
+try {
   new ContentTranslator();
+} catch (err) {
+  // Guard against rare edge cases (e.g., extension injected into about:blank)
+  console.warn('[UniversalTranslator] Failed to initialize:', err);
 }

@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>Universal Webpage Translator - Performance & Accuracy Benchmark</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      margin: 0;
+      padding: 24px;
+      background: #f6f7f8;
+      color: #18191c;
+    }
+    .header {
+      background: #fff;
+      padding: 20px;
+      border-radius: 12px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
+    .nav-bar {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+    .nav-item {
+      padding: 8px 16px;
+      background: #00aeec;
+      color: #fff;
+      border-radius: 20px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 16px;
+      margin-bottom: 30px;
+    }
+    .card {
+      background: #fff;
+      border-radius: 8px;
+      padding: 16px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .card-title {
+      font-weight: 600;
+      font-size: 15px;
+      line-height: 1.4;
+    }
+    .card-stats {
+      display: flex;
+      justify-content: space-between;
+      color: #9499a0;
+      font-size: 13px;
+    }
+    .buttons {
+      display: flex;
+      gap: 8px;
+      margin-top: 8px;
+    }
+    .btn {
+      padding: 6px 12px;
+      border-radius: 6px;
+      border: 1px solid #e3e5e7;
+      background: #f1f2f3;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    .btn-primary {
+      background: #00aeec;
+      color: #fff;
+      border-color: #00aeec;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Universal Translator Benchmark (979-term Local Dict + In-Place Engine)</h1>
+    <p>Testing in-place native replacement without floating overlay drift ("text in the air")</p>
+    <div class="nav-bar">
+      <span class="nav-item">首页</span>
+      <span class="nav-item">动画</span>
+      <span class="nav-item">番剧</span>
+      <span class="nav-item">国创</span>
+      <span class="nav-item">音乐</span>
+      <span class="nav-item">舞蹈</span>
+      <span class="nav-item">游戏</span>
+      <span class="nav-item">知识</span>
+      <span class="nav-item">科技数码</span>
+      <span class="nav-item">运动</span>
+      <span class="nav-item">汽车</span>
+      <span class="nav-item">生活</span>
+      <span class="nav-item">美食</span>
+      <span class="nav-item">动物圈</span>
+      <span class="nav-item">鬼畜</span>
+      <span class="nav-item">时尚</span>
+      <span class="nav-item">资讯</span>
+      <span class="nav-item">娱乐</span>
+      <span class="nav-item">专栏</span>
+      <span class="nav-item">直播</span>
+      <span class="nav-item">活动</span>
+      <span class="nav-item">课堂</span>
+      <span class="nav-item">社区中心</span>
+    </div>
+  </div>
+
+  <div class="grid" id="card-grid">
+    <!-- 8 sample video cards with common Bilibili UI terms -->
+    <div class="card">
+      <div class="card-title">超燃动漫剪辑：全程高能视觉盛宴！</div>
+      <div class="card-stats">
+        <span>12.5万次播放</span>
+        <span>1053条弹幕</span>
+        <span>3小时前</span>
+      </div>
+      <div class="buttons">
+        <button class="btn btn-primary">关注</button>
+        <button class="btn">点赞</button>
+        <button class="btn">投币</button>
+        <button class="btn">收藏</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">硬核科技拆解：下一代芯片架构深度剖析</div>
+      <div class="card-stats">
+        <span>45.2万次播放</span>
+        <span>2384条弹幕</span>
+        <span>昨天 15:30</span>
+      </div>
+      <div class="buttons">
+        <button class="btn btn-primary">关注</button>
+        <button class="btn">点赞</button>
+        <button class="btn">投币</button>
+        <button class="btn">分享</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">游戏通关实况：零失误极限通关挑战</div>
+      <div class="card-stats">
+        <span>8.9万次播放</span>
+        <span>520条弹幕</span>
+        <span>刚刚</span>
+      </div>
+      <div class="buttons">
+        <button class="btn btn-primary">已关注</button>
+        <button class="btn">倍速: 1.5x</button>
+        <button class="btn">清晰度: 1080P</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">家常美食教学：三步做出地道回锅肉</div>
+      <div class="card-stats">
+        <span>89.4万次播放</span>
+        <span>4311条弹幕</span>
+        <span>2天前</span>
+      </div>
+      <div class="buttons">
+        <button class="btn btn-primary">关注</button>
+        <button class="btn">点赞</button>
+        <button class="btn">收藏</button>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

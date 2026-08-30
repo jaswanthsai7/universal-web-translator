@@ -27,8 +27,9 @@ const DEFAULT_SETTINGS: TranslatorSettings = {
     fontSize: 13,
     opacity: 0.95,
     theme: 'glass-dark',
-    showFloatingHUD: true,
+    showFloatingHUD: false,
     showOriginalOnHover: true,
+    concurrency: 3,
   },
 };
 

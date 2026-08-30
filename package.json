@@ -1,7 +1,7 @@
 {
-  "name": "universal-webpage-translator",
+  "name": "bilibili-english",
   "version": "1.0.0",
-  "description": "Free, robust universal webpage translator designed for dynamic websites and modern SPAs like Bilibili without breaking functionality",
+  "description": "Bilibili English real-time translation extension with in-place native DOM replacement and local dictionary support",
   "type": "module",
   "scripts": {
     "dev": "vite",

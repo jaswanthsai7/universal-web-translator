@@ -55,7 +55,9 @@ export function isIgnoredElement(el: Node | Element | null): boolean {
     if (current.nodeType === Node.ELEMENT_NODE) {
       const element = current as Element;
       if (element.tagName && IGNORED_TAGS.has(element.tagName.toUpperCase())) return true;
-      if (typeof element.hasAttribute === 'function' && element.hasAttribute('data-webtrans-ignore')) return true;
+      if (typeof element.hasAttribute === 'function') {
+        if (element.hasAttribute('data-webtrans-ignore') || element.hasAttribute('data-webtrans-owned')) return true;
+      }
       if (element.id && typeof element.id === 'string' && element.id.startsWith('universal-webtrans-')) return true;
 
       if (element.className && typeof element.className === 'string') {

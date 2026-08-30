@@ -1,36 +1,34 @@
 import { TextExtractTarget, TranslatorSettings } from '../types';
-import { isElementVisible } from '../utils/dom';
 
-interface CachedTypography {
-  color: string;
-  fontFamily: string;
-  fontSize: string;
-  fontWeight: string;
-  fontStyle: string;
-  lineHeight: string;
-  letterSpacing: string;
-  textAlign: string;
-  textTransform: string;
-  whiteSpace: string;
-  wordBreak: string;
-  display: string;
-  numericFontSize: number;
+export interface TextNodeState {
+  original: string;
+  injectedValue: string;
+  translation: string;
+  extraNode?: HTMLElement | null;
+  applied: boolean;
 }
 
+/**
+ * In-Place Native DOM Translation Engine.
+ *
+ * Inspired by high-performance extensions like "BiliBili To English":
+ * - Translates text directly in-place by updating `node.nodeValue` while
+ *   preserving leading and trailing whitespace.
+ * - Leaves the framework's DOM hierarchy 100% intact (preserves Node instances,
+ *   event listeners, flexbox/grid layout, and CSS styles).
+ * - Zero floating coordinate drift: text NEVER "goes into the air".
+ * - Supports bilingual mode via lightweight inline sibling tags (`data-webtrans-owned="1"`).
+ * - Self-mutation aware: ignores its own characterData mutations to prevent loops.
+ */
 export class OverlayManager {
-  private overlayContainer: HTMLElement | null = null;
-  private styleSheet: HTMLStyleElement | null = null;
-  private activeOverlays: Map<TextExtractTarget, HTMLElement> = new Map();
-  private typographyCache: WeakMap<HTMLElement, CachedTypography> = new WeakMap();
-  private hiddenElements: Set<HTMLElement> = new Set();
-  private isRepositionScheduled = false;
+  private textState = new WeakMap<Node, TextNodeState>();
+  private activeNodes = new Set<Node>();
+  private activeExtraNodes = new Set<HTMLElement>();
+  private modifiedAttributes = new Set<{ element: HTMLElement; attr: string; original: string }>();
   private settings: TranslatorSettings;
 
   constructor(settings: TranslatorSettings) {
     this.settings = settings;
-    this.initContainer();
-    this.injectStyles();
-    this.bindEvents();
   }
 
   updateSettings(settings: TranslatorSettings) {
@@ -38,357 +36,265 @@ export class OverlayManager {
     this.settings = settings;
 
     if (oldMode !== settings.mode) {
-      this.clear();
-      this.initContainer();
-      this.injectStyles();
-    } else {
-      this.repositionAll();
+      // Re-apply current translations under the new mode
+      this.reapplyAll();
     }
   }
 
-  private initContainer() {
-    if (this.overlayContainer && this.overlayContainer.isConnected) return;
-
-    const container = document.createElement('div');
-    container.id = 'universal-webtrans-overlay-container';
-    container.setAttribute('data-webtrans-ignore', 'true');
-    container.style.cssText = `
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      pointer-events: none !important;
-      z-index: 2147483640;
-      overflow: visible;
-      contain: layout style;
-    `;
-    (document.body || document.documentElement).appendChild(container);
-    this.overlayContainer = container;
-  }
-
-  private injectStyles() {
-    if (this.styleSheet && this.styleSheet.isConnected) return;
-
-    const style = document.createElement('style');
-    style.id = 'universal-webtrans-styles';
-    style.setAttribute('data-webtrans-ignore', 'true');
-    style.textContent = `
-      .webtrans-orig-hidden {
-        color: transparent !important;
-        text-shadow: none !important;
-      }
-      .webtrans-orig-hidden::placeholder {
-        color: transparent !important;
-      }
-      .webtrans-orig-hidden > svg,
-      .webtrans-orig-hidden > img,
-      .webtrans-orig-hidden > i,
-      .webtrans-orig-hidden > canvas,
-      .webtrans-orig-hidden > [class*="icon"],
-      .webtrans-orig-hidden > [class*="svg"] {
-        color: initial !important;
-        visibility: visible !important;
-        opacity: 1 !important;
-      }
-      .webtrans-native-text {
-        background: transparent !important;
-        border: none !important;
-        box-shadow: none !important;
-        outline: none !important;
-        padding: 0 !important;
-        margin: 0 !important;
-        pointer-events: none !important;
-        user-select: text;
-        box-sizing: border-box;
-      }
-      .webtrans-dual-text {
-        display: block;
-        font-size: 0.88em;
-        color: #3b82f6;
-        opacity: 0.9;
-        margin-top: 2px;
-      }
-    `;
-    (document.head || document.documentElement).appendChild(style);
-    this.styleSheet = style;
-  }
-
-  private bindEvents() {
-    const triggerReposition = () => {
-      if (!this.isRepositionScheduled) {
-        this.isRepositionScheduled = true;
-        requestAnimationFrame(() => {
-          this.repositionAll();
-          this.isRepositionScheduled = false;
-        });
-      }
-    };
-
-    window.addEventListener('scroll', triggerReposition, { passive: true });
-    window.addEventListener('resize', triggerReposition, { passive: true });
-    document.addEventListener('fullscreenchange', triggerReposition);
-  }
-
   /**
-   * Apply natural in-place translation to the target element
+   * Applies translation to a target element or text node.
    */
   applyTranslation(target: TextExtractTarget, rawTranslatedText: string) {
     if (!rawTranslatedText) return;
 
-    // Clean any unwanted tags or prefix labels
     const cleanTranslation = rawTranslatedText
-      .replace(/^\[(?:EN|ZH|JA|KO|ES|FR|DE|RU):\s*/i, '')
+      .replace(/^\[(?:EN|ZH|JA|KO|ES|FR|DE|RU|PT|IT|AR|HI|TR|VI|TH|ID):\s*/i, '')
       .replace(/\]$/, '')
       .trim();
 
-    if (!cleanTranslation || cleanTranslation === target.originalText.trim()) {
-      return;
-    }
+    if (!cleanTranslation) return;
     target.translatedText = cleanTranslation;
 
-    // Handle attributes (placeholder, title, aria-label)
     if (target.type === 'attribute' && target.attributeName) {
       this.applyAttributeTranslation(target, cleanTranslation);
       return;
     }
 
-    const el = target.element;
-    if (!el || !el.isConnected) return;
-
-    // Cache typography before hiding original text
-    const typography = this.getOrCacheTypography(el);
-
-    if (this.settings.mode === 'translated-only') {
-      // 1. Visually hide original text glyphs without altering layout geometry
-      el.classList.add('webtrans-orig-hidden');
-      this.hiddenElements.add(el);
-
-      // 2. Render clean native-looking text overlay in exact same visual region
-      this.renderNativeOverlay(target, cleanTranslation, typography);
-    } else if (this.settings.mode === 'dual') {
-      // Dual mode: show both original and translated text
-      this.renderDualOverlay(target, cleanTranslation, typography);
-    } else if (this.settings.mode === 'hover') {
-      // Hover mode: attach native title tooltip
-      el.setAttribute('title', cleanTranslation);
+    if (target.type === 'css-before' || target.type === 'css-after') {
+      // Pseudo-elements cannot have nodeValue edited; apply via data-attribute or title
+      target.element.setAttribute(`data-webtrans-${target.type}`, cleanTranslation);
+      return;
     }
+
+    // DOM Text Node translation
+    const node = target.node;
+    if (!node || node.nodeType !== Node.TEXT_NODE || !node.isConnected) return;
+
+    this.applyTextNodeTranslation(node, target.originalText, cleanTranslation);
   }
 
-  private getOrCacheTypography(el: HTMLElement): CachedTypography {
-    let cached = this.typographyCache.get(el);
-    if (!cached) {
-      const computed = window.getComputedStyle(el);
-      const fontSizeStr = computed.fontSize || '14px';
-      const numSize = parseFloat(fontSizeStr) || 14;
-
-      cached = {
-        color: computed.color || '#18191c',
-        fontFamily: computed.fontFamily || '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-        fontSize: fontSizeStr,
-        fontWeight: computed.fontWeight || '400',
-        fontStyle: computed.fontStyle || 'normal',
-        lineHeight: computed.lineHeight || 'normal',
-        letterSpacing: computed.letterSpacing || 'normal',
-        textAlign: computed.textAlign || 'left',
-        textTransform: computed.textTransform || 'none',
-        whiteSpace: computed.whiteSpace || 'normal',
-        wordBreak: computed.wordBreak || 'break-word',
-        display: computed.display || 'block',
-        numericFontSize: numSize,
+  /**
+   * Translates a text node in-place
+   */
+  private applyTextNodeTranslation(node: Node, originalText: string, translatedText: string) {
+    let state = this.textState.get(node);
+    if (!state) {
+      state = {
+        original: originalText || node.nodeValue || '',
+        injectedValue: '',
+        translation: translatedText,
+        applied: false,
       };
-      this.typographyCache.set(el, cached);
-    }
-    return cached;
-  }
-
-  private renderNativeOverlay(
-    target: TextExtractTarget,
-    translatedText: string,
-    typography: CachedTypography
-  ) {
-    this.initContainer();
-    if (!this.overlayContainer) return;
-
-    const el = target.element;
-    if (!isElementVisible(el)) return;
-
-    let overlay = this.activeOverlays.get(target);
-    if (!overlay) {
-      overlay = document.createElement('div');
-      overlay.className = 'webtrans-native-text';
-      overlay.setAttribute('data-webtrans-ignore', 'true');
-      this.overlayContainer.appendChild(overlay);
-      this.activeOverlays.set(target, overlay);
+      this.textState.set(node, state);
     }
 
-    overlay.textContent = translatedText;
-    this.applyNativeStyle(overlay, typography, el, translatedText, target.originalText);
-    this.positionOverlay(target, overlay);
-  }
+    const mode = this.settings.mode;
 
-  private renderDualOverlay(
-    target: TextExtractTarget,
-    translatedText: string,
-    typography: CachedTypography
-  ) {
-    this.initContainer();
-    if (!this.overlayContainer) return;
+    if (mode === 'translated-only') {
+      // Remove any previously attached bilingual sibling
+      this.removeExtraNode(state);
 
-    const el = target.element;
-    if (!isElementVisible(el)) return;
+      const origVal = state.original || node.nodeValue || '';
+      let leadWs = origVal.match(/^(\s+)/)?.[1] ?? '';
+      let trailWs = origVal.match(/(\s+)$/)?.[1] ?? '';
 
-    let overlay = this.activeOverlays.get(target);
-    if (!overlay) {
-      overlay = document.createElement('div');
-      overlay.className = 'webtrans-native-text';
-      overlay.setAttribute('data-webtrans-ignore', 'true');
-      this.overlayContainer.appendChild(overlay);
-      this.activeOverlays.set(target, overlay);
-    }
+      // Add boundary spacing if adjacent to element nodes
+      if (!leadWs && node.previousSibling?.nodeType === Node.ELEMENT_NODE) leadWs = ' ';
+      if (!trailWs && node.nextSibling?.nodeType === Node.ELEMENT_NODE) trailWs = ' ';
 
-    overlay.style.fontFamily = typography.fontFamily;
-    overlay.innerHTML = `<span class="webtrans-dual-text">${translatedText}</span>`;
-    this.positionOverlay(target, overlay);
-  }
-
-  private applyNativeStyle(
-    overlay: HTMLElement,
-    typography: CachedTypography,
-    el: HTMLElement,
-    translatedText: string,
-    originalText: string
-  ) {
-    let effectiveFontSize = typography.fontSize;
-
-    // For tight button/tag containers where English is longer than Chinese,
-    // subtly scale font size by 1-1.5px so it fits into the same visual region without wrapping
-    const isTightButton =
-      el.tagName === 'BUTTON' ||
-      el.classList.contains('ctrl-btn') ||
-      el.classList.contains('bpx-menu-item') ||
-      el.classList.contains('nav-link') ||
-      typography.whiteSpace === 'nowrap';
-
-    if (isTightButton && translatedText.length > originalText.length * 2.2) {
-      const reduced = Math.max(11, typography.numericFontSize - 1.5);
-      effectiveFontSize = `${reduced}px`;
-    }
-
-    overlay.style.position = 'absolute';
-    overlay.style.fontFamily = typography.fontFamily;
-    overlay.style.fontSize = effectiveFontSize;
-    overlay.style.fontWeight = typography.fontWeight;
-    overlay.style.fontStyle = typography.fontStyle;
-    overlay.style.lineHeight = typography.lineHeight;
-    overlay.style.letterSpacing = typography.letterSpacing;
-    overlay.style.textAlign = typography.textAlign;
-    overlay.style.textTransform = typography.textTransform;
-    overlay.style.color = typography.color;
-    overlay.style.background = 'transparent';
-    overlay.style.border = 'none';
-    overlay.style.boxShadow = 'none';
-    overlay.style.outline = 'none';
-    overlay.style.padding = '0';
-    overlay.style.margin = '0';
-    overlay.style.pointerEvents = 'none';
-    overlay.style.userSelect = 'text';
-    overlay.style.zIndex = '2147483640';
-    overlay.style.overflow = 'visible';
-    overlay.style.whiteSpace = typography.whiteSpace === 'nowrap' ? 'nowrap' : 'normal';
-    overlay.style.wordBreak = typography.wordBreak;
-
-    if (typography.display.includes('flex')) {
-      overlay.style.display = 'flex';
-      overlay.style.alignItems = 'center';
-    } else {
-      overlay.style.display = 'block';
-    }
-  }
-
-  private positionOverlay(target: TextExtractTarget, overlay: HTMLElement) {
-    const el = target.element;
-    if (!el || !el.isConnected) {
-      overlay.remove();
-      this.activeOverlays.delete(target);
-      return;
-    }
-
-    if (!isElementVisible(el)) {
-      overlay.style.display = 'none';
-      return;
-    }
-
-    overlay.style.display = 'block';
-    const rect = el.getBoundingClientRect();
-    const scrollX = window.scrollX || window.pageXOffset;
-    const scrollY = window.scrollY || window.pageYOffset;
-
-    // Anchor overlay exactly in the original element's visual location
-    overlay.style.top = `${rect.top + scrollY}px`;
-    overlay.style.left = `${rect.left + scrollX}px`;
-    overlay.style.width = `${rect.width}px`;
-    overlay.style.minHeight = `${rect.height}px`;
-  }
-
-  repositionAll() {
-    for (const [target, overlay] of this.activeOverlays.entries()) {
-      if (!target.element.isConnected) {
-        overlay.remove();
-        this.activeOverlays.delete(target);
-        continue;
+      const withWs = leadWs + translatedText + trailWs;
+      if (node.nodeValue !== withWs) {
+        node.nodeValue = withWs;
       }
-      this.positionOverlay(target, overlay);
+
+      state.injectedValue = withWs;
+      state.translation = translatedText;
+      state.applied = true;
+      this.activeNodes.add(node);
+    } else if (mode === 'dual') {
+      // Dual / bilingual mode: keep original text in nodeValue and insert adjacent span
+      if (node.nodeValue !== state.original) {
+        node.nodeValue = state.original;
+      }
+
+      let extraNode = state.extraNode;
+      if (!extraNode || !extraNode.isConnected) {
+        extraNode = document.createElement('span');
+        extraNode.setAttribute('data-webtrans-owned', '1');
+        extraNode.setAttribute('data-webtrans-ignore', 'true');
+        extraNode.className = 'webtrans-bilingual-tag';
+        extraNode.style.cssText = 'color: #3b82f6; font-size: 0.88em; margin-left: 4px; pointer-events: none; user-select: text;';
+
+        if (node.parentNode) {
+          node.parentNode.insertBefore(extraNode, node.nextSibling);
+        }
+        state.extraNode = extraNode;
+        this.activeExtraNodes.add(extraNode);
+      }
+
+      extraNode.textContent = ` | ${translatedText}`;
+      state.injectedValue = state.original;
+      state.translation = translatedText;
+      state.applied = true;
+      this.activeNodes.add(node);
+    } else if (mode === 'hover') {
+      // Hover mode: restore original text and add tooltip to parent element
+      if (node.nodeValue !== state.original) {
+        node.nodeValue = state.original;
+      }
+      this.removeExtraNode(state);
+
+      const parent = node.parentElement;
+      if (parent) {
+        parent.setAttribute('title', translatedText);
+      }
+      state.injectedValue = state.original;
+      state.applied = true;
     }
   }
 
-  private applyAttributeTranslation(target: TextExtractTarget, translatedText: string) {
+  /**
+   * Applies translation to an HTML attribute (placeholder, title, aria-label, alt)
+   */
+  private applyAttributeTranslation(target: TextExtractTarget, cleanTranslation: string) {
     const el = target.element;
     const attr = target.attributeName!;
+    if (!el || !el.isConnected) return;
+
+    const original = target.originalText;
 
     if (attr === 'placeholder' && (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement)) {
       if (!el.hasAttribute('data-webtrans-orig-placeholder')) {
-        el.setAttribute('data-webtrans-orig-placeholder', target.originalText);
+        el.setAttribute('data-webtrans-orig-placeholder', original);
+        this.modifiedAttributes.add({ element: el, attr: 'placeholder', original });
       }
-      el.placeholder = translatedText;
+      (el as any)['__webtrans_last_placeholder'] = cleanTranslation;
+      (el as any)['__webtrans_last_title'] = cleanTranslation;
+      el.placeholder = cleanTranslation;
+      el.setAttribute('placeholder', cleanTranslation);
+      if (el.getAttribute('title') === original || !el.getAttribute('title')) {
+        el.setAttribute('title', cleanTranslation);
+      }
     } else if (attr === 'title') {
       if (!el.hasAttribute('data-webtrans-orig-title')) {
-        el.setAttribute('data-webtrans-orig-title', target.originalText);
+        el.setAttribute('data-webtrans-orig-title', original);
+        this.modifiedAttributes.add({ element: el, attr: 'title', original });
       }
-      el.setAttribute('title', translatedText);
-    } else if (attr === 'aria-label') {
-      el.setAttribute('aria-label', translatedText);
+      (el as any)['__webtrans_last_title'] = cleanTranslation;
+      el.setAttribute('title', cleanTranslation);
+    } else if (attr === 'aria-label' || attr === 'aria-placeholder' || attr === 'aria-description') {
+      if (!el.hasAttribute(`data-webtrans-orig-${attr}`)) {
+        el.setAttribute(`data-webtrans-orig-${attr}`, original);
+        this.modifiedAttributes.add({ element: el, attr, original });
+      }
+      el.setAttribute(attr, cleanTranslation);
+    } else if (attr === 'alt' && el instanceof HTMLImageElement) {
+      if (!el.hasAttribute('data-webtrans-orig-alt')) {
+        el.setAttribute('data-webtrans-orig-alt', original);
+        this.modifiedAttributes.add({ element: el, attr: 'alt', original });
+      }
+      el.alt = cleanTranslation;
     }
   }
 
+  private removeExtraNode(state: TextNodeState) {
+    if (state.extraNode) {
+      if (state.extraNode.isConnected) {
+        state.extraNode.remove();
+      }
+      this.activeExtraNodes.delete(state.extraNode);
+      state.extraNode = null;
+    }
+  }
+
+  /**
+   * Re-applies active translations when switching modes (e.g. translated-only <-> dual)
+   */
+  private reapplyAll() {
+    for (const node of this.activeNodes) {
+      if (!node.isConnected) {
+        this.activeNodes.delete(node);
+        continue;
+      }
+      const state = this.textState.get(node);
+      if (state && state.applied && state.translation) {
+        this.applyTextNodeTranslation(node, state.original, state.translation);
+      }
+    }
+  }
+
+  /**
+   * Checks if a mutation's new nodeValue was injected by this translator.
+   * Used by MutationObserver to prevent infinite loops.
+   */
+  isSelfMutation(node: Node, newValue: string): boolean {
+    const state = this.textState.get(node);
+    if (!state) return false;
+    return state.injectedValue === newValue;
+  }
+
+  /**
+   * Notifies translator that a text node was updated externally by the host application (e.g. Vue/React).
+   */
+  updateOriginalText(node: Node, newOriginal: string) {
+    const state = this.textState.get(node);
+    if (state) {
+      state.original = newOriginal;
+      state.applied = false;
+      state.injectedValue = '';
+    }
+  }
+
+  /**
+   * In-place translation naturally flows with layout; repositionAll is a no-op kept for interface compatibility.
+   */
+  repositionAll() {
+    // No-op for in-place translations
+  }
+
+  /**
+   * Compatibility helper for tests.
+   */
+  drainForTesting() {
+    // In-place updates apply synchronously
+  }
+
+  /**
+   * Restores all modified nodes and attributes to their original untranslated state.
+   */
   clear() {
-    // Remove all native text overlays
-    if (this.overlayContainer) {
-      this.overlayContainer.innerHTML = '';
-    }
-    this.activeOverlays.clear();
-
-    // Restore original text visibility by removing hidden class
-    for (const el of this.hiddenElements) {
-      if (el.isConnected) {
-        el.classList.remove('webtrans-orig-hidden');
+    // Restore text nodes
+    for (const node of this.activeNodes) {
+      if (node.isConnected) {
+        const state = this.textState.get(node);
+        if (state && state.original) {
+          node.nodeValue = state.original;
+        }
       }
     }
-    this.hiddenElements.clear();
+    this.activeNodes.clear();
 
-    // Restore original attributes
-    document.querySelectorAll<HTMLElement>('[data-webtrans-orig-placeholder]').forEach(el => {
-      const orig = el.getAttribute('data-webtrans-orig-placeholder');
-      if (orig && (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement)) {
-        el.placeholder = orig;
+    // Remove bilingual tags
+    for (const extra of this.activeExtraNodes) {
+      if (extra.isConnected) {
+        extra.remove();
       }
-      el.removeAttribute('data-webtrans-orig-placeholder');
-    });
+    }
+    this.activeExtraNodes.clear();
 
-    document.querySelectorAll<HTMLElement>('[data-webtrans-orig-title]').forEach(el => {
-      const orig = el.getAttribute('data-webtrans-orig-title');
-      if (orig) el.setAttribute('title', orig);
-      el.removeAttribute('data-webtrans-orig-title');
-    });
+    // Restore attributes
+    for (const item of this.modifiedAttributes) {
+      if (item.element.isConnected) {
+        if (item.attr === 'placeholder' && (item.element instanceof HTMLInputElement || item.element instanceof HTMLTextAreaElement)) {
+          item.element.placeholder = item.original;
+        } else if (item.attr === 'alt' && item.element instanceof HTMLImageElement) {
+          item.element.alt = item.original;
+        } else {
+          item.element.setAttribute(item.attr, item.original);
+        }
+        item.element.removeAttribute(`data-webtrans-orig-${item.attr}`);
+      }
+    }
+    this.modifiedAttributes.clear();
   }
 }

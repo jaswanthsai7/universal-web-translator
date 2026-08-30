@@ -1,10 +1,8 @@
-# 🌐 Universal Webpage Translator (Manifest V3)
+# 📺 Bilibili English (Manifest V3)
 
-> **A Free, Robust, Universal Webpage Translation Extension for Dynamic Web Applications (Bilibili, SPAs, React/Vue)**
+> **A Fast, Robust Real-Time Translation Extension for Bilibili and Modern SPAs (React/Vue)**
 
-Standard browser translation tools (such as Google Translate's built-in feature) frequently fail on modern web applications like **Bilibili**, **YouTube**, and complex Single-Page Applications (SPAs). They destructively modify or replace DOM text nodes, breaking React/Vue virtual DOM reconciliation with errors like `Uncaught NotFoundError: Failed to execute 'removeChild' on 'Node'`, destroying event listeners, and missing dynamically loaded dropdowns, popups, and comments.
-
-**Universal Webpage Translator** solves this by decoupling the visual translation layer from the underlying website's application logic. It uses a **non-destructive visual overlay architecture** with `pointer-events: none`, meaning the website's original DOM and event listeners remain **100% intact**.
+**Bilibili English** provides seamless, real-time in-place translation for Bilibili content without breaking website functionality, Vue/React reactivity, or layout geometry. It features an embedded 980+ term local dictionary for instant 0ms translation of interface categories, buttons, and player controls, coupled with background AI/API translation for dynamic video titles and comments.
 
 ---
 

@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Universal Webpage Translator",
+  "name": "Bilibili English",
   "version": "1.0.0",
-  "description": "Free, robust universal webpage translator designed specifically for dynamic websites like Bilibili without breaking DOM or framework functionality",
+  "description": "Translate BiliBili content instantly in real-time with native in-place translation and local dictionary support",
   "permissions": [
     "storage",
     "activeTab",
@@ -20,7 +20,7 @@
       "matches": ["<all_urls>"],
       "js": ["content.js"],
       "all_frames": true,
-      "run_at": "document_end"
+      "run_at": "document_start"
     }
   ],
   "action": {

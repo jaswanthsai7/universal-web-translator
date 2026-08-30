@@ -17,6 +17,11 @@ export class FloatingHUD {
   constructor(settings: TranslatorSettings, callbacks: HUDCallbacks) {
     this.settings = settings;
     this.callbacks = callbacks;
+
+    // Remove any stale HUD from prior hot-reloads
+    const existing = document.getElementById('universal-webtrans-hud-root');
+    if (existing) existing.remove();
+
     if (this.settings.appearance.showFloatingHUD) {
       this.render();
     }
@@ -36,6 +41,7 @@ export class FloatingHUD {
   }
 
   setStatus(text: string, isTranslating: boolean = false) {
+    if (!this.settings.appearance.showFloatingHUD) return;
     this.statusText = text;
     const statusBadge = this.rootEl?.querySelector<HTMLElement>('.webtrans-hud-status');
     if (statusBadge) {
@@ -45,6 +51,7 @@ export class FloatingHUD {
   }
 
   private render() {
+    if (!this.settings.appearance.showFloatingHUD) return;
     if (this.rootEl && this.rootEl.isConnected) return;
 
     const hud = document.createElement('div');
@@ -136,7 +143,7 @@ export class FloatingHUD {
         ">
           <div style="display: flex; justify-content: space-between; align-items: center;">
             <div style="display: flex; align-items: center; gap: 6px; font-weight: 600;">
-              <span>🌐 Web Translator</span>
+              <span>📺 Bilibili English</span>
             </div>
             <button id="webtrans-close-btn" style="
               background: transparent;

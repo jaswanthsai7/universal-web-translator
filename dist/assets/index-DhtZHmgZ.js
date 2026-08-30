@@ -46,9 +46,27 @@ const MESSAGE_TYPES = {
 };
 let currentSettings;
 document.addEventListener("DOMContentLoaded", async () => {
+  setupTabs();
   await loadSettings();
   bindEvents();
 });
+function setupTabs() {
+  const tabButtons = document.querySelectorAll(".tab-btn");
+  const tabPanels = document.querySelectorAll(".tab-panel");
+  tabButtons.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const targetId = btn.getAttribute("data-tab");
+      if (!targetId) return;
+      tabButtons.forEach((b) => b.classList.remove("active"));
+      tabPanels.forEach((p) => p.classList.remove("active"));
+      btn.classList.add("active");
+      const targetPanel = document.getElementById(targetId);
+      if (targetPanel) {
+        targetPanel.classList.add("active");
+      }
+    });
+  });
+}
 async function loadSettings() {
   try {
     const res = await chrome.runtime.sendMessage({ type: MESSAGE_TYPES.GET_SETTINGS });
@@ -87,8 +105,8 @@ function populateForm(s) {
     opacity.value = String(Math.round((s.appearance.opacity || 0.95) * 100));
     if (opacityVal) opacityVal.textContent = opacity.value;
   }
-  if (themeSelect) themeSelect.value = s.appearance.theme || "glass-dark";
-  if (showHud) showHud.checked = s.appearance.showFloatingHUD !== false;
+  if (themeSelect) themeSelect.value = s.appearance.theme || "auto";
+  if (showHud) showHud.checked = s.appearance.showFloatingHUD === true;
   renderSiteRules(s.siteSettings);
 }
 function renderSiteRules(siteSettings) {
@@ -96,16 +114,16 @@ function renderSiteRules(siteSettings) {
   if (!container) return;
   const entries = Object.entries(siteSettings);
   if (entries.length === 0) {
-    container.innerHTML = `<p class="empty-text">No custom domain overrides set. Translation is active on all supported sites.</p>`;
+    container.innerHTML = `<p class="empty-text">No custom domain overrides. Translation is active across all supported sites.</p>`;
     return;
   }
   container.innerHTML = entries.map(
     ([domain, cfg]) => `
-      <div style="display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.06);">
-        <span style="font-weight: 500;">${domain}</span>
-        <div style="display: flex; align-items: center; gap: 10px;">
-          <span style="color: ${cfg.enabled ? "#4ade80" : "#ef4444"}; font-size: 12px;">${cfg.enabled ? "Enabled" : "Disabled"}</span>
-          <button class="btn-remove-domain" data-domain="${domain}" style="background: none; border: none; color: #94a3b8; cursor: pointer;">✕</button>
+      <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px;">
+        <span style="font-weight: 600; font-size: 13px;">${domain}</span>
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <span style="color: ${cfg.enabled ? "#10b981" : "#ef4444"}; font-size: 12px; font-weight: 500;">${cfg.enabled ? "Enabled" : "Disabled"}</span>
+          <button type="button" class="btn-remove-domain" data-domain="${domain}" style="background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 14px;">✕</button>
         </div>
       </div>
     `
@@ -143,9 +161,9 @@ function bindEvents() {
     if (fallback2 !== "none" && fallback2 !== fallback1) fallbackChain.push(fallback2);
     currentSettings.provider = primaryProvider;
     currentSettings.fallbackChain = fallbackChain;
-    currentSettings.customApiUrl = document.getElementById("custom-api-url").value;
-    currentSettings.customApiKey = document.getElementById("custom-api-key").value;
-    currentSettings.customApiModel = document.getElementById("custom-api-model").value;
+    currentSettings.customApiUrl = document.getElementById("custom-api-url").value.trim();
+    currentSettings.customApiKey = document.getElementById("custom-api-key").value.trim();
+    currentSettings.customApiModel = document.getElementById("custom-api-model").value.trim();
     currentSettings.appearance.fontSize = Number(fontSize.value);
     currentSettings.appearance.opacity = Number(opacity.value) / 100;
     currentSettings.appearance.theme = document.getElementById("theme-select").value;

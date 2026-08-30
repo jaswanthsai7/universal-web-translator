@@ -3,9 +3,31 @@ import { TranslatorSettings, MESSAGE_TYPES, ProviderType } from '../types';
 let currentSettings: TranslatorSettings;
 
 document.addEventListener('DOMContentLoaded', async () => {
+  setupTabs();
   await loadSettings();
   bindEvents();
 });
+
+function setupTabs() {
+  const tabButtons = document.querySelectorAll<HTMLButtonElement>('.tab-btn');
+  const tabPanels = document.querySelectorAll<HTMLElement>('.tab-panel');
+
+  tabButtons.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const targetId = btn.getAttribute('data-tab');
+      if (!targetId) return;
+
+      tabButtons.forEach((b) => b.classList.remove('active'));
+      tabPanels.forEach((p) => p.classList.remove('active'));
+
+      btn.classList.add('active');
+      const targetPanel = document.getElementById(targetId);
+      if (targetPanel) {
+        targetPanel.classList.add('active');
+      }
+    });
+  });
+}
 
 async function loadSettings() {
   try {
@@ -51,8 +73,8 @@ function populateForm(s: TranslatorSettings) {
     if (opacityVal) opacityVal.textContent = opacity.value;
   }
 
-  if (themeSelect) themeSelect.value = s.appearance.theme || 'glass-dark';
-  if (showHud) showHud.checked = s.appearance.showFloatingHUD !== false;
+  if (themeSelect) themeSelect.value = s.appearance.theme || 'auto';
+  if (showHud) showHud.checked = s.appearance.showFloatingHUD === true;
 
   renderSiteRules(s.siteSettings);
 }
@@ -63,18 +85,18 @@ function renderSiteRules(siteSettings: Record<string, any>) {
 
   const entries = Object.entries(siteSettings);
   if (entries.length === 0) {
-    container.innerHTML = `<p class="empty-text">No custom domain overrides set. Translation is active on all supported sites.</p>`;
+    container.innerHTML = `<p class="empty-text">No custom domain overrides. Translation is active across all supported sites.</p>`;
     return;
   }
 
   container.innerHTML = entries
     .map(
       ([domain, cfg]) => `
-      <div style="display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.06);">
-        <span style="font-weight: 500;">${domain}</span>
-        <div style="display: flex; align-items: center; gap: 10px;">
-          <span style="color: ${cfg.enabled ? '#4ade80' : '#ef4444'}; font-size: 12px;">${cfg.enabled ? 'Enabled' : 'Disabled'}</span>
-          <button class="btn-remove-domain" data-domain="${domain}" style="background: none; border: none; color: #94a3b8; cursor: pointer;">✕</button>
+      <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px;">
+        <span style="font-weight: 600; font-size: 13px;">${domain}</span>
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <span style="color: ${cfg.enabled ? '#10b981' : '#ef4444'}; font-size: 12px; font-weight: 500;">${cfg.enabled ? 'Enabled' : 'Disabled'}</span>
+          <button type="button" class="btn-remove-domain" data-domain="${domain}" style="background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 14px;">✕</button>
         </div>
       </div>
     `
@@ -121,9 +143,9 @@ function bindEvents() {
 
     currentSettings.provider = primaryProvider;
     currentSettings.fallbackChain = fallbackChain;
-    currentSettings.customApiUrl = (document.getElementById('custom-api-url') as HTMLInputElement).value;
-    currentSettings.customApiKey = (document.getElementById('custom-api-key') as HTMLInputElement).value;
-    currentSettings.customApiModel = (document.getElementById('custom-api-model') as HTMLInputElement).value;
+    currentSettings.customApiUrl = (document.getElementById('custom-api-url') as HTMLInputElement).value.trim();
+    currentSettings.customApiKey = (document.getElementById('custom-api-key') as HTMLInputElement).value.trim();
+    currentSettings.customApiModel = (document.getElementById('custom-api-model') as HTMLInputElement).value.trim();
 
     currentSettings.appearance.fontSize = Number(fontSize.value);
     currentSettings.appearance.opacity = Number(opacity.value) / 100;

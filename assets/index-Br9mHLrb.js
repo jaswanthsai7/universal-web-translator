@@ -46,12 +46,37 @@ const MESSAGE_TYPES = {
 };
 let currentSettings;
 let currentHostname = "";
+let currentTheme = "auto";
 document.addEventListener("DOMContentLoaded", async () => {
+  initTheme();
   await initActiveTabInfo();
   await loadSettings();
   await updateCacheStats();
   bindUIEvents();
 });
+function initTheme() {
+  const saved = localStorage.getItem("bilibili_english_theme");
+  if (saved) {
+    applyTheme(saved);
+  } else {
+    applyTheme("auto");
+  }
+}
+function applyTheme(theme) {
+  currentTheme = theme;
+  localStorage.setItem("bilibili_english_theme", theme);
+  const icon = document.getElementById("theme-icon");
+  if (theme === "light") {
+    document.documentElement.setAttribute("data-theme", "light");
+    if (icon) icon.textContent = "☀️";
+  } else if (theme === "dark") {
+    document.documentElement.setAttribute("data-theme", "dark");
+    if (icon) icon.textContent = "🌙";
+  } else {
+    document.documentElement.removeAttribute("data-theme");
+    if (icon) icon.textContent = "🌓";
+  }
+}
 async function initActiveTabInfo() {
   const domainLabel = document.getElementById("current-domain");
   if (typeof chrome !== "undefined" && chrome.tabs && chrome.tabs.query) {
@@ -103,7 +128,29 @@ function populateForm(s) {
     const siteConfig = s.siteSettings[currentHostname];
     siteToggle.checked = siteConfig ? siteConfig.enabled : true;
   }
+  syncDropdown("source-dropdown", "source-lang-label", s.sourceLang);
+  syncDropdown("target-dropdown", "target-lang-label", s.targetLang);
+  syncDropdown("engine-dropdown", "engine-label", s.provider);
   updateModeButtons(s.mode);
+}
+function syncDropdown(wrapperId, labelId, value) {
+  const wrapper = document.getElementById(wrapperId);
+  const label = document.getElementById(labelId);
+  if (!wrapper) return;
+  const items = wrapper.querySelectorAll(".menu-item");
+  let selectedText = "";
+  items.forEach((item) => {
+    var _a;
+    const val = item.getAttribute("data-value");
+    const isSelected = val === value;
+    item.classList.toggle("selected", isSelected);
+    if (isSelected) {
+      selectedText = ((_a = item.textContent) == null ? void 0 : _a.trim()) ?? "";
+    }
+  });
+  if (label && selectedText) {
+    label.textContent = selectedText;
+  }
 }
 function updateModeButtons(mode) {
   const transOnlyBtn = document.getElementById("mode-translated-only");
@@ -123,6 +170,8 @@ function bindUIEvents() {
   const togglePopups = document.getElementById("toggle-popups");
   const toggleTooltips = document.getElementById("toggle-tooltips");
   const togglePlaceholders = document.getElementById("toggle-placeholders");
+  const btnThemeToggle = document.getElementById("theme-toggle-btn");
+  const btnSwapLang = document.getElementById("btn-swap-lang");
   const btnTranslatedOnly = document.getElementById("mode-translated-only");
   const btnDual = document.getElementById("mode-dual");
   const btnHover = document.getElementById("mode-hover");
@@ -150,11 +199,59 @@ function bindUIEvents() {
       settings: currentSettings
     });
   };
+  btnThemeToggle == null ? void 0 : btnThemeToggle.addEventListener("click", () => {
+    if (currentTheme === "auto") {
+      applyTheme("light");
+    } else if (currentTheme === "light") {
+      applyTheme("dark");
+    } else {
+      applyTheme("auto");
+    }
+  });
+  const allDropdowns = document.querySelectorAll(".custom-dropdown");
+  const setupDropdown = (wrapperId, triggerId, labelId, selectId) => {
+    const wrapper = document.getElementById(wrapperId);
+    const trigger = document.getElementById(triggerId);
+    const select = document.getElementById(selectId);
+    if (!wrapper || !trigger) return;
+    trigger.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const wasOpen = wrapper.classList.contains("open");
+      allDropdowns.forEach((d) => d.classList.remove("open"));
+      if (!wasOpen) wrapper.classList.add("open");
+    });
+    const items = wrapper.querySelectorAll(".menu-item");
+    items.forEach((item) => {
+      item.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const val = item.getAttribute("data-value") || "";
+        if (select) select.value = val;
+        syncDropdown(wrapperId, labelId, val);
+        wrapper.classList.remove("open");
+        saveCurrent();
+      });
+    });
+  };
+  setupDropdown("source-dropdown", "source-lang-trigger", "source-lang-label", "source-lang");
+  setupDropdown("target-dropdown", "target-lang-trigger", "target-lang-label", "target-lang");
+  setupDropdown("engine-dropdown", "engine-trigger", "engine-label", "provider-select");
+  document.addEventListener("click", () => {
+    allDropdowns.forEach((d) => d.classList.remove("open"));
+  });
+  btnSwapLang == null ? void 0 : btnSwapLang.addEventListener("click", () => {
+    if (!currentSettings) return;
+    const prevSource = sourceLang.value;
+    const prevTarget = targetLang.value;
+    const newSource = prevTarget;
+    const newTarget = prevSource === "auto" ? "zh" : prevSource;
+    sourceLang.value = newSource;
+    targetLang.value = newTarget;
+    syncDropdown("source-dropdown", "source-lang-label", newSource);
+    syncDropdown("target-dropdown", "target-lang-label", newTarget);
+    saveCurrent();
+  });
   globalToggle == null ? void 0 : globalToggle.addEventListener("change", saveCurrent);
   siteToggle == null ? void 0 : siteToggle.addEventListener("change", saveCurrent);
-  sourceLang == null ? void 0 : sourceLang.addEventListener("change", saveCurrent);
-  targetLang == null ? void 0 : targetLang.addEventListener("change", saveCurrent);
-  provider == null ? void 0 : provider.addEventListener("change", saveCurrent);
   toggleDynamic == null ? void 0 : toggleDynamic.addEventListener("change", saveCurrent);
   togglePopups == null ? void 0 : togglePopups.addEventListener("change", saveCurrent);
   toggleTooltips == null ? void 0 : toggleTooltips.addEventListener("change", saveCurrent);
@@ -211,9 +308,9 @@ async function updateCacheStats() {
   try {
     const res = await chrome.runtime.sendMessage({ type: MESSAGE_TYPES.GET_CACHE_STATS });
     if (res && res.success && res.stats) {
-      cacheText.textContent = `Cache: ${res.stats.inMemoryCount} items (${res.stats.hitCount} hits)`;
+      cacheText.textContent = `${res.stats.inMemoryCount} cached`;
     }
   } catch {
-    cacheText.textContent = "Cache: ready";
+    cacheText.textContent = "ready";
   }
 }

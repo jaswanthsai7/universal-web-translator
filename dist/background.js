@@ -515,8 +515,9 @@ const DEFAULT_SETTINGS = {
     fontSize: 13,
     opacity: 0.95,
     theme: "glass-dark",
-    showFloatingHUD: true,
-    showOriginalOnHover: true
+    showFloatingHUD: false,
+    showOriginalOnHover: true,
+    concurrency: 3
   }
 };
 class BackgroundService {
