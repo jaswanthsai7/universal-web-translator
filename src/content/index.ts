@@ -158,17 +158,39 @@ class ContentTranslator {
   // ── Immediate above-the-fold scan ─────────────────────────────────────
 
   /**
-   * Synchronously extracts text from the first ~100 elements in the document.
-   * These are almost always above the fold. Runs immediately after DOMContentLoaded
-   * without waiting for settings to return from storage.
+   * Synchronously extracts text from the header and above-the-fold navigation.
+   * Runs immediately without waiting for settings to return from storage.
    */
   private immediateViewportScan() {
     const root = document.body ?? document.documentElement;
     if (!root) return;
 
-    const candidates = root.querySelectorAll<HTMLElement>('*');
-    const limit = Math.min(candidates.length, 150);
     const targets: TextExtractTarget[] = [];
+
+    // 1. Explicitly scan top header, subnav, and channel bars
+    const prioritySelectors = [
+      '.bili-header',
+      '.bili-header__bar',
+      '.bili-header__channel',
+      '.channel-icons',
+      '.channel-items__left',
+      '.channel-items__right',
+      '.channel-link',
+      'header',
+      '#bili-header-container'
+    ];
+
+    for (const sel of prioritySelectors) {
+      const els = root.querySelectorAll<HTMLElement>(sel);
+      els.forEach((el) => {
+        const extracted = this.textExtractor.extractFromRoot(el, this.settings);
+        for (const t of extracted) { t.priority = 0; targets.push(t); }
+      });
+    }
+
+    // 2. Scan the first ~400 general elements across the top
+    const candidates = root.querySelectorAll<HTMLElement>('*');
+    const limit = Math.min(candidates.length, 400);
 
     for (let i = 0; i < limit; i++) {
       const el = candidates[i];

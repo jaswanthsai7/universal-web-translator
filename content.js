@@ -924,7 +924,6 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
         for (; i < chunkEnd; i++) {
           const el = allElements[i];
           const roughTop = getOffsetTop(el);
-          if (roughTop < viewportH && roughTop >= 0) continue;
           const targets = this.extractor.extractFromRoot(el, this.settings);
           if (targets.length === 0) continue;
           if (roughTop < nearLimit) {
@@ -940,18 +939,16 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
       scheduleIdle(processChunk);
     }
     /**
-     * Fast synchronous scan of only visible-viewport elements.
-     * Uses a TreeWalker over a limited depth so it doesn't traverse the
-     * entire document tree on every keystroke.
+     * Fast synchronous scan of visible-viewport elements.
      */
     extractViewportTargets(root, viewportH) {
       const targets = [];
       const candidates = root.querySelectorAll("*");
-      const limit = Math.min(candidates.length, 500);
+      const limit = Math.min(candidates.length, 800);
       for (let i = 0; i < limit; i++) {
         const el = candidates[i];
         const top = getOffsetTop(el);
-        if (top > viewportH * 1.2) break;
+        if (top > viewportH * 1.5) continue;
         const extracted = this.extractor.extractFromRoot(el, this.settings);
         for (const t of extracted) {
           t.priority = 0;
@@ -2417,16 +2414,36 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
     }
     // ── Immediate above-the-fold scan ─────────────────────────────────────
     /**
-     * Synchronously extracts text from the first ~100 elements in the document.
-     * These are almost always above the fold. Runs immediately after DOMContentLoaded
-     * without waiting for settings to return from storage.
+     * Synchronously extracts text from the header and above-the-fold navigation.
+     * Runs immediately without waiting for settings to return from storage.
      */
     immediateViewportScan() {
       const root = document.body ?? document.documentElement;
       if (!root) return;
-      const candidates = root.querySelectorAll("*");
-      const limit = Math.min(candidates.length, 150);
       const targets = [];
+      const prioritySelectors = [
+        ".bili-header",
+        ".bili-header__bar",
+        ".bili-header__channel",
+        ".channel-icons",
+        ".channel-items__left",
+        ".channel-items__right",
+        ".channel-link",
+        "header",
+        "#bili-header-container"
+      ];
+      for (const sel of prioritySelectors) {
+        const els = root.querySelectorAll(sel);
+        els.forEach((el) => {
+          const extracted = this.textExtractor.extractFromRoot(el, this.settings);
+          for (const t of extracted) {
+            t.priority = 0;
+            targets.push(t);
+          }
+        });
+      }
+      const candidates = root.querySelectorAll("*");
+      const limit = Math.min(candidates.length, 400);
       for (let i = 0; i < limit; i++) {
         const el = candidates[i];
         const extracted = this.textExtractor.extractFromRoot(el, this.settings);

@@ -82,11 +82,7 @@ export class ScannerWorker {
 
       for (; i < chunkEnd; i++) {
         const el = allElements[i];
-        // Get rough position — offsetTop is cheap and doesn't force layout
         const roughTop = getOffsetTop(el);
-
-        // Skip elements already covered in P0
-        if (roughTop < viewportH && roughTop >= 0) continue;
 
         const targets = this.extractor.extractFromRoot(el, this.settings);
         if (targets.length === 0) continue;
@@ -110,21 +106,19 @@ export class ScannerWorker {
   }
 
   /**
-   * Fast synchronous scan of only visible-viewport elements.
-   * Uses a TreeWalker over a limited depth so it doesn't traverse the
-   * entire document tree on every keystroke.
+   * Fast synchronous scan of visible-viewport elements.
    */
   private extractViewportTargets(root: Element, viewportH: number): TextExtractTarget[] {
     const targets: TextExtractTarget[] = [];
 
     // Collect candidate elements that are visually in or near the viewport
     const candidates = root.querySelectorAll<HTMLElement>('*');
-    const limit = Math.min(candidates.length, 500); // cap to avoid blocking
+    const limit = Math.min(candidates.length, 800); // scan first 800 elements without premature break
 
     for (let i = 0; i < limit; i++) {
       const el = candidates[i];
       const top = getOffsetTop(el);
-      if (top > viewportH * 1.2) break; // Stop once past viewport + small buffer
+      if (top > viewportH * 1.5) continue; // Skip elements far below, but do NOT break early
 
       const extracted = this.extractor.extractFromRoot(el, this.settings);
       for (const t of extracted) {
