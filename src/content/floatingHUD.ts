@@ -18,18 +18,18 @@ export class FloatingHUD {
     this.settings = settings;
     this.callbacks = callbacks;
 
-    // Remove any stale HUD from prior hot-reloads
+    // Always purge any stale HUD element from the DOM
     const existing = document.getElementById('universal-webtrans-hud-root');
     if (existing) existing.remove();
 
-    if (this.settings.appearance.showFloatingHUD) {
+    if (this.settings.appearance?.showFloatingHUD === true) {
       this.render();
     }
   }
 
   updateSettings(settings: TranslatorSettings) {
     this.settings = settings;
-    if (!this.settings.appearance.showFloatingHUD) {
+    if (this.settings.appearance?.showFloatingHUD !== true) {
       this.destroy();
     } else {
       if (!this.rootEl) {
@@ -292,9 +292,11 @@ export class FloatingHUD {
   }
 
   destroy() {
+    const existing = document.getElementById('universal-webtrans-hud-root');
+    if (existing) existing.remove();
     if (this.rootEl && this.rootEl.isConnected) {
       this.rootEl.remove();
-      this.rootEl = null;
     }
+    this.rootEl = null;
   }
 }

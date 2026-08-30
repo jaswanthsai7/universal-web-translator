@@ -76,7 +76,6 @@ class GoogleWebProvider extends BaseProvider {
     __publicField(this, "id", "google");
     __publicField(this, "name", "Google Web (Free)");
     __publicField(this, "supportsAutoDetect", true);
-    __publicField(this, "DELIMITER", "⟦§§⟧");
   }
   async translate(texts, sourceLanguage, targetLanguage) {
     if (texts.length === 0) return [];
@@ -87,18 +86,16 @@ class GoogleWebProvider extends BaseProvider {
       return [single];
     }
     try {
-      const combinedText = texts.join(`
-${this.DELIMITER}
-`);
-      if (combinedText.length < 1800) {
-        const translatedCombined = await this.translateSingle(combinedText, sl, tl);
-        const split = translatedCombined.split(new RegExp(`\\s*${this.DELIMITER}\\s*`));
+      const combinedText = texts.join("\n");
+      if (combinedText.length < 2e3) {
+        const translatedCombined = await this.translateViaClients5(combinedText, sl, tl);
+        const split = translatedCombined.split("\n");
         if (split.length === texts.length) {
           return split.map((t) => t.trim());
         }
       }
     } catch (batchErr) {
-      logger.warn("GoogleWebProvider batch translate failed, falling back to concurrent single:", batchErr);
+      logger.warn("GoogleWebProvider batch newline translate failed, trying concurrent:", batchErr);
     }
     return this.mapConcurrent(texts, 4, async (text) => {
       return this.translateSingle(text, sl, tl);
@@ -106,6 +103,36 @@ ${this.DELIMITER}
   }
   async translateSingle(text, sl, tl) {
     if (!text.trim()) return text;
+    try {
+      return await this.translateViaClients5(text, sl, tl);
+    } catch (err) {
+      logger.debug("clients5 endpoint failed, trying gtx fallback:", err);
+    }
+    return this.translateViaGtx(text, sl, tl);
+  }
+  async translateViaClients5(text, sl, tl) {
+    const url = `https://clients5.google.com/translate_a/t?client=dict-chrome-ex&sl=${encodeURIComponent(
+      sl
+    )}&tl=${encodeURIComponent(tl)}&q=${encodeURIComponent(text)}`;
+    const res = await this.fetchWithTimeout(url, {
+      method: "GET",
+      headers: {
+        "Accept": "application/json"
+      }
+    }, 6e3);
+    if (!res.ok) {
+      throw new Error(`clients5 returned status ${res.status}: ${res.statusText}`);
+    }
+    const data = await res.json();
+    if (Array.isArray(data) && Array.isArray(data[0]) && typeof data[0][0] === "string") {
+      return data[0][0];
+    }
+    if (Array.isArray(data) && typeof data[0] === "string") {
+      return data[0];
+    }
+    throw new Error("Unexpected response format from clients5 Google Translate API");
+  }
+  async translateViaGtx(text, sl, tl) {
     const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${encodeURIComponent(
       sl
     )}&tl=${encodeURIComponent(tl)}&dt=t&q=${encodeURIComponent(text)}`;
@@ -114,13 +141,13 @@ ${this.DELIMITER}
       headers: {
         "Accept": "application/json"
       }
-    }, 7e3);
+    }, 6e3);
     if (!res.ok) {
-      throw new Error(`Google translate returned status ${res.status}: ${res.statusText}`);
+      throw new Error(`gtx returned status ${res.status}: ${res.statusText}`);
     }
     const data = await res.json();
     if (!Array.isArray(data) || !Array.isArray(data[0])) {
-      throw new Error("Unexpected response format from Google Translate API");
+      throw new Error("Unexpected response format from gtx Google Translate API");
     }
     const translatedParts = data[0].map((part) => Array.isArray(part) && typeof part[0] === "string" ? part[0] : "").join("");
     return translatedParts || text;
@@ -302,7 +329,7 @@ class ProviderManager {
   constructor() {
     __publicField(this, "providers", /* @__PURE__ */ new Map());
     __publicField(this, "activeProviderId", "google");
-    __publicField(this, "fallbackChain", ["google", "libretranslate", "mymemory"]);
+    __publicField(this, "fallbackChain", ["google", "mymemory", "libretranslate"]);
     this.registerProvider(new GoogleWebProvider());
     this.registerProvider(new LibreTranslateProvider());
     this.registerProvider(new MyMemoryProvider());

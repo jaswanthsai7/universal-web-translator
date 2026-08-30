@@ -8,7 +8,7 @@ import { logger } from '../utils/logger';
 export class ProviderManager {
   private providers: Map<ProviderType, TranslationProvider> = new Map();
   private activeProviderId: ProviderType = 'google';
-  private fallbackChain: ProviderType[] = ['google', 'libretranslate', 'mymemory'];
+  private fallbackChain: ProviderType[] = ['google', 'mymemory', 'libretranslate'];
 
   constructor() {
     this.registerProvider(new GoogleWebProvider());

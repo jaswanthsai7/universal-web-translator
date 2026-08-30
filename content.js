@@ -31,9 +31,9 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
     "WEBTRANS-HUD"
   ]);
   const IGNORED_CLASSES = [
-    "bpx-player-danmaku",
-    // Bilibili danmaku bullet comments
-    "bpx-player-video-wrap",
+    "bpx-player-row-dm",
+    // Flying bullet comments on video canvas
+    "bpx-player-danmaku-item",
     "webtrans-ignore",
     "webtrans-overlay",
     "webtrans-hud-root"
@@ -1007,17 +1007,19 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
       __publicField(this, "callbacks");
       __publicField(this, "isExpanded", false);
       __publicField(this, "statusText", "Ready");
+      var _a;
       this.settings = settings;
       this.callbacks = callbacks;
       const existing = document.getElementById("universal-webtrans-hud-root");
       if (existing) existing.remove();
-      if (this.settings.appearance.showFloatingHUD) {
+      if (((_a = this.settings.appearance) == null ? void 0 : _a.showFloatingHUD) === true) {
         this.render();
       }
     }
     updateSettings(settings) {
+      var _a;
       this.settings = settings;
-      if (!this.settings.appearance.showFloatingHUD) {
+      if (((_a = this.settings.appearance) == null ? void 0 : _a.showFloatingHUD) !== true) {
         this.destroy();
       } else {
         if (!this.rootEl) {
@@ -1263,10 +1265,12 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
       });
     }
     destroy() {
+      const existing = document.getElementById("universal-webtrans-hud-root");
+      if (existing) existing.remove();
       if (this.rootEl && this.rootEl.isConnected) {
         this.rootEl.remove();
-        this.rootEl = null;
       }
+      this.rootEl = null;
     }
   }
   const BILIBILI_EN_DICT = {
@@ -2276,6 +2280,37 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
     return null;
   }
   function localizeDynamicPhrases(str) {
+    const followMatch = str.match(/^[+＋]?\s*(关注|已关注|互相关注)\s*(\d+(?:\.\d+)?[万kKwW]?)?$/);
+    if (followMatch) {
+      const type = followMatch[1];
+      const count = followMatch[2] ? ` ${followMatch[2]}` : "";
+      if (type === "已关注") return `Following${count}`;
+      if (type === "互相关注") return `Mutual Follow${count}`;
+      return `+ Follow${count}`;
+    }
+    if (/^发消息$/.test(str)) return "Send Message";
+    if (/^发个友善的弹幕见证当下$/.test(str)) return "Send a friendly danmaku...";
+    if (/^发[条个]?弹幕$/.test(str)) return "Send Danmaku";
+    if (/^小窗$/.test(str)) return "Pop-out";
+    if (/^客服$/.test(str)) return "Support";
+    if (/^顶部$/.test(str)) return "Top";
+    if (/^底部$/.test(str)) return "Bottom";
+    if (/^反馈$/.test(str)) return "Feedback";
+    if (/^点赞$/.test(str)) return "Like";
+    if (/^投币$/.test(str)) return "Coin";
+    if (/^收藏$/.test(str)) return "Favorite";
+    if (/^分享$/.test(str)) return "Share";
+    if (/^稿件投诉$/.test(str)) return "Manuscript report";
+    if (/^记笔记$/.test(str)) return "Take notes";
+    if (/^弹幕礼仪$/.test(str)) return "Barrage etiquette";
+    if (/^发送$/.test(str)) return "Send";
+    const discMatch = str.match(/^发现\s*[《<](.+?)[》>]$/);
+    if (discMatch) return `Discover "${discMatch[1]}"`;
+    const catTagMatch = str.match(/^(电影|电视剧|纪录片|番剧|国创)\s*(.+)$/);
+    if (catTagMatch) {
+      const cat = catTagMatch[1] === "电影" ? "Movie" : catTagMatch[1] === "电视剧" ? "TV" : catTagMatch[1] === "纪录片" ? "Documentary" : catTagMatch[1] === "番剧" ? "Anime" : "Donghua";
+      return `${cat}: ${catTagMatch[2]}`;
+    }
     let m = str.match(/^(视频素材|贴纸素材)\s*([\d+]+)$/);
     if (m) {
       const label = m[1] === "视频素材" ? "Video Materials" : "Sticker Materials";

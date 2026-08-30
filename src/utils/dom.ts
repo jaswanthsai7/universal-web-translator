@@ -22,8 +22,8 @@ const IGNORED_TAGS = new Set([
 ]);
 
 const IGNORED_CLASSES = [
-  'bpx-player-danmaku', // Bilibili danmaku bullet comments
-  'bpx-player-video-wrap',
+  'bpx-player-row-dm', // Flying bullet comments on video canvas
+  'bpx-player-danmaku-item',
   'webtrans-ignore',
   'webtrans-overlay',
   'webtrans-hud-root',

@@ -40,6 +40,48 @@ export function getLocalTranslation(text: string, targetLang = 'en'): string | n
 }
 
 function localizeDynamicPhrases(str: string): string | null {
+  // Follow buttons: "+ 关注 56", "关注 56", "+ 关注", "已关注", "互相关注"
+  const followMatch = str.match(/^[+＋]?\s*(关注|已关注|互相关注)\s*(\d+(?:\.\d+)?[万kKwW]?)?$/);
+  if (followMatch) {
+    const type = followMatch[1];
+    const count = followMatch[2] ? ` ${followMatch[2]}` : '';
+    if (type === '已关注') return `Following${count}`;
+    if (type === '互相关注') return `Mutual Follow${count}`;
+    return `+ Follow${count}`;
+  }
+
+  // Common interactive buttons
+  if (/^发消息$/.test(str)) return 'Send Message';
+  if (/^发个友善的弹幕见证当下$/.test(str)) return 'Send a friendly danmaku...';
+  if (/^发[条个]?弹幕$/.test(str)) return 'Send Danmaku';
+  if (/^小窗$/.test(str)) return 'Pop-out';
+  if (/^客服$/.test(str)) return 'Support';
+  if (/^顶部$/.test(str)) return 'Top';
+  if (/^底部$/.test(str)) return 'Bottom';
+  if (/^反馈$/.test(str)) return 'Feedback';
+  if (/^点赞$/.test(str)) return 'Like';
+  if (/^投币$/.test(str)) return 'Coin';
+  if (/^收藏$/.test(str)) return 'Favorite';
+  if (/^分享$/.test(str)) return 'Share';
+  if (/^稿件投诉$/.test(str)) return 'Manuscript report';
+  if (/^记笔记$/.test(str)) return 'Take notes';
+  if (/^弹幕礼仪$/.test(str)) return 'Barrage etiquette';
+  if (/^发送$/.test(str)) return 'Send';
+
+  // Tag formats: "发现《...》" -> "Discover \"...\""
+  const discMatch = str.match(/^发现\s*[《<](.+?)[》>]$/);
+  if (discMatch) return `Discover "${discMatch[1]}"`;
+
+  // Category prefixes: "电影蜘蛛侠崭新之日" -> "Movie: 蜘蛛侠崭新之日"
+  const catTagMatch = str.match(/^(电影|电视剧|纪录片|番剧|国创)\s*(.+)$/);
+  if (catTagMatch) {
+    const cat = catTagMatch[1] === '电影' ? 'Movie' :
+                catTagMatch[1] === '电视剧' ? 'TV' :
+                catTagMatch[1] === '纪录片' ? 'Documentary' :
+                catTagMatch[1] === '番剧' ? 'Anime' : 'Donghua';
+    return `${cat}: ${catTagMatch[2]}`;
+  }
+
   // e.g. 视频素材 9999+ / 贴纸素材 9999+
   let m = str.match(/^(视频素材|贴纸素材)\s*([\d+]+)$/);
   if (m) {
