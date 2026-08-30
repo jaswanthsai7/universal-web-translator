@@ -27,15 +27,15 @@ function isInsideSparkle(x, y, cx, cy, R) {
 
 /**
  * Renders the iconic Bilibili TV mascot into a crisp anti-aliased PNG.
- * Color: Vibrant Premium Gold / Yellow #FFB300 (RGB: 255, 179, 0)
+ * Color: Claude Signature Terracotta Coral #D97757 (RGB: 217, 119, 87)
  */
 export function createBilibiliIconPNG(size) {
   const S = size;
   const lineSize = 1 + S * 4;
   const raw = Buffer.alloc(S * lineSize);
 
-  // Vibrant Gold / Yellow: #FFB300 -> RGB(255, 179, 0)
-  const [R, G, B] = [255, 179, 0];
+  // Claude Terracotta Coral: #D97757 -> RGB(217, 119, 87)
+  const [R, G, B] = [217, 119, 87];
   const pixelDelta = 2.0 / S; // Size of 1 pixel in normalized [-1, 1] coords
 
   // Geometry tailored for crisp appearance at all resolutions (16, 48, 128)
