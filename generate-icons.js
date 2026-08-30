@@ -27,16 +27,15 @@ function isInsideSparkle(x, y, cx, cy, R) {
 
 /**
  * Renders the iconic Bilibili TV mascot into a crisp anti-aliased PNG.
- * Primary color: Bilibili Cyan Blue #23ADE5 (RGB: 35, 173, 229)
- * Eyes: Authentic Shining Sparkle Stars (✨ Emoji Style)
+ * Color: Vibrant Premium Gold / Yellow #FFB300 (RGB: 255, 179, 0)
  */
 export function createBilibiliIconPNG(size) {
   const S = size;
   const lineSize = 1 + S * 4;
   const raw = Buffer.alloc(S * lineSize);
 
-  // Primary Bilibili Blue: #23ADE5 -> RGB(35, 173, 229)
-  const [R, G, B] = [35, 173, 229];
+  // Vibrant Gold / Yellow: #FFB300 -> RGB(255, 179, 0)
+  const [R, G, B] = [255, 179, 0];
   const pixelDelta = 2.0 / S; // Size of 1 pixel in normalized [-1, 1] coords
 
   // Geometry tailored for crisp appearance at all resolutions (16, 48, 128)
@@ -54,12 +53,10 @@ export function createBilibiliIconPNG(size) {
   const a2x = 0.24, a2y = tvCenterY - tvHalfH + 0.04;
   const a2bx = 0.46, a2by = -0.66;
 
-  // Shining Sparkle Eyes (✨)
+  // Classic vertical oval eyes
   const eyeOffsetX = 0.24;
   const eyeCenterY = tvCenterY + 0.02;
-  const starR = size <= 16 ? 0.22 : size <= 48 ? 0.19 : 0.18;
-
-  const subSteps = [-0.375, -0.125, 0.125, 0.375];
+  const eyeRadius = size <= 16 ? 0.11 : 0.09;
 
   for (let py = 0; py < S; py++) {
     const lineOffset = py * lineSize;
@@ -78,47 +75,19 @@ export function createBilibiliIconPNG(size) {
       const dAnt1 = sdSegment(x, y, a1x, a1y, a1bx, a1by) - strokeW / 2;
       const dAnt2 = sdSegment(x, y, a2x, a2y, a2bx, a2by) - strokeW / 2;
 
-      // Distance to blue body (box and antennae)
-      const dBody = Math.min(dBox, dAnt1, dAnt2);
-      const alphaBody = Math.max(0, Math.min(1, 0.5 - dBody / (pixelDelta * 1.2)));
+      // 3. Distance to classic oval eyes
+      const dEye1 = Math.sqrt((x + eyeOffsetX) ** 2 + ((y - eyeCenterY) / 1.2) ** 2) - eyeRadius;
+      const dEye2 = Math.sqrt((x - eyeOffsetX) ** 2 + ((y - eyeCenterY) / 1.2) ** 2) - eyeRadius;
 
-      // 3. Shining Sparkle Stars (✨) with 4x4 anti-aliasing
-      let insideCount = 0;
-      for (const sdy of subSteps) {
-        const sy = y + sdy * pixelDelta;
-        for (const sdx of subSteps) {
-          const sx = x + sdx * pixelDelta;
-          if (isInsideSparkle(sx, sy, -eyeOffsetX, eyeCenterY, starR) ||
-              isInsideSparkle(sx, sy, eyeOffsetX, eyeCenterY, starR)) {
-            insideCount++;
-          }
-        }
-      }
-      const alphaStar = insideCount / 16;
+      // Unified distance for entire gold mascot
+      const minD = Math.min(dBox, dAnt1, dAnt2, dEye1, dEye2);
+      const alpha = Math.max(0, Math.min(1, 0.5 - minD / (pixelDelta * 1.2)));
 
-      if (alphaStar > 0) {
-        // ✨ Emoji Golden Sparkle:
-        // Center has brilliant luminous shine, tapering into warm sunny golden arms
-        const distRatio = Math.min(
-          Math.hypot(x - (-eyeOffsetX), y - eyeCenterY),
-          Math.hypot(x - eyeOffsetX, y - eyeCenterY)
-        ) / starR;
-
-        const shine = Math.max(0, 1 - distRatio / 0.40);
-        const starR_val = 255;
-        const starG_val = Math.round(185 + 65 * shine);
-        const starB_val = Math.round(15 + 230 * (shine ** 2));
-
-        raw[offset] = starR_val;
-        raw[offset + 1] = starG_val;
-        raw[offset + 2] = starB_val;
-        raw[offset + 3] = Math.round(alphaStar * 255);
-      } else if (alphaBody > 0) {
-        // Bilibili Cyan Blue: #23ADE5 -> RGB(35, 173, 229)
+      if (alpha > 0) {
         raw[offset] = R;
         raw[offset + 1] = G;
         raw[offset + 2] = B;
-        raw[offset + 3] = Math.round(alphaBody * 255);
+        raw[offset + 3] = Math.round(alpha * 255);
       } else {
         raw[offset] = 0;
         raw[offset + 1] = 0;
