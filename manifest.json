@@ -1,12 +1,11 @@
 {
   "manifest_version": 3,
   "name": "BiliBili English Translator",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Translate BiliBili content instantly in real-time with native in-place translation and local dictionary support",
   "permissions": [
     "storage",
-    "activeTab",
-    "scripting"
+    "activeTab"
   ],
   "host_permissions": [
     "<all_urls>"
@@ -40,11 +39,5 @@
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
-  },
-  "web_accessible_resources": [
-    {
-      "resources": ["popup.html", "options.html"],
-      "matches": ["<all_urls>"]
-    }
-  ]
+  }
 }

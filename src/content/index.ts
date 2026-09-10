@@ -150,6 +150,7 @@ class ContentTranslator {
       if (!this.isCurrentSiteEnabled()) {
         this.queue.reset();
         this.overlayManager.clear();
+        this.mutationManager.pause();
         this.floatingHUD.setStatus('Disabled for site');
       }
     });
@@ -334,11 +335,12 @@ class ContentTranslator {
         this.scannerWorker.updateSettings(this.settings);
         this.floatingHUD.updateSettings(this.settings);
 
-        if (!this.settings.enabled) {
+        const isSiteEnabled = this.isCurrentSiteEnabled();
+        if (!this.settings.enabled || !isSiteEnabled) {
           this.queue.reset();
           this.overlayManager.clear();
           this.mutationManager.pause();
-          this.floatingHUD.setStatus('Paused');
+          this.floatingHUD.setStatus(isSiteEnabled ? 'Paused' : 'Disabled for site');
         } else {
           this.mutationManager.resume();
           if (!oldEnabled || oldTargetLang !== this.settings.targetLang) {
@@ -371,11 +373,12 @@ class ContentTranslator {
       }).catch(() => {});
     }
 
-    if (!this.settings.enabled) {
+    const isSiteEnabled = this.isCurrentSiteEnabled();
+    if (!this.settings.enabled || !isSiteEnabled) {
       this.queue.reset();
       this.overlayManager.clear();
       this.mutationManager.pause();
-      this.floatingHUD.setStatus('Paused');
+      this.floatingHUD.setStatus(isSiteEnabled ? 'Paused' : 'Disabled for site');
     } else {
       this.mutationManager.resume();
     }

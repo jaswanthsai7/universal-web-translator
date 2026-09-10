@@ -1,5 +1,6 @@
 import { TextExtractTarget, TranslatorSettings } from '../types';
 import type { TextExtractor } from './textExtractor';
+import { isIgnoredElement } from '../utils/dom';
 
 export interface TextNodeState {
   original: string;
@@ -40,6 +41,26 @@ export class OverlayManager {
    */
   applyTranslation(target: TextExtractTarget, rawTranslatedText: string) {
     if (!rawTranslatedText) return;
+
+    // Safety guard: Never apply translation if the node or parent is editable or focused
+    if (target.type === 'text') {
+      if (target.node && isIgnoredElement(target.node)) return;
+      if (target.element && isIgnoredElement(target.element)) return;
+
+      // Verify text node is not currently part of the user's active caret / selection
+      if (typeof window !== 'undefined' && window.getSelection) {
+        try {
+          const sel = window.getSelection();
+          if (sel && sel.rangeCount > 0 && typeof sel.containsNode === 'function' && target.node) {
+            if (sel.containsNode(target.node, true)) return;
+          }
+        } catch {}
+      }
+    } else if (target.type === 'attribute' && target.element) {
+      if (typeof document !== 'undefined' && document.activeElement === target.element) {
+        return; // Don't modify attributes on the element the user is actively focused on
+      }
+    }
 
     const cleanTranslation = rawTranslatedText
       .replace(/^\[(?:EN|ZH|JA|KO|ES|FR|DE|RU|PT|IT|AR|HI|TR|VI|TH|ID):\s*/i, '')

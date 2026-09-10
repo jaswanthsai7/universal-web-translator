@@ -189,6 +189,9 @@ function bindUIEvents() {
     currentSettings.translateTooltips = toggleTooltips.checked;
     currentSettings.translatePlaceholders = togglePlaceholders.checked;
     if (currentHostname) {
+      if (!currentSettings.siteSettings) {
+        currentSettings.siteSettings = {};
+      }
       currentSettings.siteSettings[currentHostname] = {
         enabled: siteToggle.checked,
         mode: currentSettings.mode

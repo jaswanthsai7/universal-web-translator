@@ -43,7 +43,7 @@ export class TextExtractor {
       const parent = textNode.parentElement;
       if (parent && !isIgnoredElement(parent)) {
         const text = textNode.nodeValue?.trim() ?? '';
-        if (text && isTranslatableString(text) && this.lastExtractedText.get(textNode) !== text) {
+        if (text && isTranslatableString(text, settings.targetLang, settings.sourceLang) && this.lastExtractedText.get(textNode) !== text) {
           this.lastExtractedText.set(textNode, text);
           targets.push({
             node: textNode,
@@ -71,7 +71,7 @@ export class TextExtractor {
           }
           if (node.nodeType === Node.TEXT_NODE) {
             const text = node.nodeValue?.trim();
-            if (!text || !isTranslatableString(text)) return NodeFilter.FILTER_REJECT;
+            if (!text || !isTranslatableString(text, settings.targetLang, settings.sourceLang)) return NodeFilter.FILTER_REJECT;
             if (this.lastExtractedText.get(node) === text) return NodeFilter.FILTER_REJECT;
             const parent = node.parentElement;
             if (!parent || isIgnoredElement(parent)) return NodeFilter.FILTER_REJECT;
@@ -118,33 +118,47 @@ export class TextExtractor {
   ) {
     const elementsToInspect: HTMLElement[] = [];
 
-    if (root instanceof HTMLElement && !isIgnoredElement(root)) {
+    if (root instanceof HTMLElement && !isIgnoredElement(root, { allowInputForAttributes: true })) {
       elementsToInspect.push(root);
       const desc = root.querySelectorAll<HTMLElement>(
         'input, textarea, [title], [aria-label], [aria-placeholder], [aria-description], img[alt], [data-tooltip], [data-title], [data-tip]',
       );
-      desc.forEach(el => { if (!isIgnoredElement(el)) elementsToInspect.push(el); });
+      desc.forEach(el => {
+        if (!isIgnoredElement(el, { allowInputForAttributes: true })) {
+          elementsToInspect.push(el);
+        }
+      });
     }
 
     for (const el of elementsToInspect) {
       if (settings.translatePlaceholders) {
-        this.extractAttr(el, 'placeholder', targets);
-        this.extractAttr(el, 'aria-placeholder', targets);
+        this.extractAttr(el, 'placeholder', targets, settings);
+        this.extractAttr(el, 'aria-placeholder', targets, settings);
       }
 
       if (settings.translateTooltips) {
-        this.extractAttr(el, 'title', targets);
-        this.extractAttr(el, 'aria-label', targets);
-        this.extractAttr(el, 'aria-description', targets);
-        this.extractAttr(el, 'data-tooltip', targets);
-        this.extractAttr(el, 'data-title', targets);
-        this.extractAttr(el, 'data-tip', targets);
-        this.extractAlt(el, targets);
+        this.extractAttr(el, 'title', targets, settings);
+        this.extractAttr(el, 'aria-label', targets, settings);
+        this.extractAttr(el, 'aria-description', targets, settings);
+        this.extractAttr(el, 'data-tooltip', targets, settings);
+        this.extractAttr(el, 'data-title', targets, settings);
+        this.extractAttr(el, 'data-tip', targets, settings);
+        this.extractAlt(el, targets, settings);
       }
     }
   }
 
-  private extractAttr(el: HTMLElement, attr: string, targets: TextExtractTarget[]) {
+  private extractAttr(
+    el: HTMLElement,
+    attr: string,
+    targets: TextExtractTarget[],
+    settings?: TranslatorSettings
+  ) {
+    // Never extract attributes from currently active/focused input to avoid cursor/typing conflict
+    if (typeof document !== 'undefined' && document.activeElement === el) {
+      return;
+    }
+
     let value: string | null = null;
 
     if (attr === 'placeholder') {
@@ -154,7 +168,7 @@ export class TextExtractor {
     }
 
     const text = value?.trim();
-    if (!text || !isTranslatableString(text)) return;
+    if (!text || !isTranslatableString(text, settings?.targetLang, settings?.sourceLang)) return;
 
     // Avoid re-extracting our own injected translations
     const origAttr = el.getAttribute(`data-webtrans-orig-${attr}`);
@@ -181,10 +195,14 @@ export class TextExtractor {
     });
   }
 
-  private extractAlt(el: HTMLElement, targets: TextExtractTarget[]) {
+  private extractAlt(
+    el: HTMLElement,
+    targets: TextExtractTarget[],
+    settings?: TranslatorSettings
+  ) {
     if (el.tagName !== 'IMG') return;
     const alt = (el as HTMLImageElement).alt?.trim();
-    if (!alt || !isTranslatableString(alt)) return;
+    if (!alt || !isTranslatableString(alt, settings?.targetLang, settings?.sourceLang)) return;
 
     let attrMap = this.lastExtractedAttrValues.get(el);
     if (!attrMap) {

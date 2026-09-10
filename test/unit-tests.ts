@@ -1,6 +1,7 @@
 import assert from 'assert';
 import { hashString, createCacheKey } from '../src/utils/hash.ts';
-import { isTranslatableString, isIgnoredElement } from '../src/utils/dom.ts';
+import { isTranslatableString, isIgnoredElement, isEditableOrActiveInput } from '../src/utils/dom.ts';
+import { JSDOM } from 'jsdom';
 import { TranslationCache } from '../src/cache/TranslationCache.ts';
 import { ProviderManager } from '../src/providers/ProviderManager.ts';
 import { BaseProvider } from '../src/providers/BaseProvider.ts';
@@ -33,7 +34,13 @@ assert.strictEqual(isTranslatableString('点赞'), true, 'Should accept Chinese 
 assert.strictEqual(isTranslatableString('倍速播放'), true, 'Should accept Chinese text');
 assert.strictEqual(isTranslatableString('チャンネル登録'), true, 'Should accept Japanese text');
 assert.strictEqual(isTranslatableString('Subscribe to channel'), true, 'Should accept English text');
-console.log('  ✔ Passed: Correctly filters noise, URLs, code, and numbers\n');
+
+// Target language-aware filtering
+assert.strictEqual(isTranslatableString('Ready when you are', 'en', 'auto'), false, 'Should ignore English when target is English');
+assert.strictEqual(isTranslatableString('fbfd', 'en', 'auto'), false, 'Should ignore English typing when target is English');
+assert.strictEqual(isTranslatableString('点赞', 'en', 'auto'), true, 'Should accept Chinese when target is English');
+assert.strictEqual(isTranslatableString('超燃动漫剪辑', 'en', 'zh'), true, 'Should accept Chinese when source is zh');
+console.log('  ✔ Passed: Correctly filters noise, URLs, code, numbers, and target-identical English text\n');
 
 // 3. Two-Tier Cache Operations
 console.log('▶ Test 3: Two-Tier Cache Operations');
@@ -99,5 +106,52 @@ assert.deepStrictEqual(
   'Fallback provider should successfully translate texts'
 );
 console.log('  ✔ Passed: Automatic fallback chain rescues failed primary requests\n');
+
+// 5. Editable & Chat Box Input Isolation Test
+console.log('▶ Test 5: Chat Box & Editable Element Protection');
+const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>');
+const testDoc = dom.window.document;
+(global as any).document = testDoc;
+(global as any).Node = dom.window.Node;
+
+// Rich text chat box (Gemini / ProseMirror / Quill style)
+const richTextarea = testDoc.createElement('rich-textarea');
+const qlEditor = testDoc.createElement('div');
+qlEditor.className = 'ql-editor';
+qlEditor.setAttribute('contenteditable', 'true');
+const p = testDoc.createElement('p');
+const textInChat = testDoc.createTextNode('Hello Gemini, do not translate me');
+p.appendChild(textInChat);
+qlEditor.appendChild(p);
+richTextarea.appendChild(qlEditor);
+testDoc.body.appendChild(richTextarea);
+
+assert.strictEqual(isEditableOrActiveInput(richTextarea), true, 'rich-textarea must be identified as editable');
+assert.strictEqual(isEditableOrActiveInput(qlEditor), true, 'ql-editor must be identified as editable');
+assert.strictEqual(isEditableOrActiveInput(p), true, 'paragraph inside contenteditable must be identified as editable');
+assert.strictEqual(isEditableOrActiveInput(textInChat), true, 'text node inside contenteditable must be identified as editable');
+assert.strictEqual(isIgnoredElement(textInChat), true, 'text node inside contenteditable must be ignored');
+
+// Native inputs
+const input = testDoc.createElement('input');
+input.placeholder = 'Search';
+assert.strictEqual(isIgnoredElement(input), true, 'input must be ignored for text node translation');
+assert.strictEqual(isIgnoredElement(input, { allowInputForAttributes: true }), false, 'unfocused input must allow placeholder attributes');
+
+const textarea = testDoc.createElement('textarea');
+assert.strictEqual(isIgnoredElement(textarea), true, 'textarea must be ignored for text node translation');
+
+// Regular non-editable content (Bilibili card)
+const regularCard = testDoc.createElement('div');
+regularCard.className = 'video-card';
+const regularTitle = testDoc.createElement('h3');
+const regularText = testDoc.createTextNode('普通视频标题');
+regularTitle.appendChild(regularText);
+regularCard.appendChild(regularTitle);
+testDoc.body.appendChild(regularCard);
+
+assert.strictEqual(isEditableOrActiveInput(regularTitle), false, 'normal video title must not be marked as editable');
+assert.strictEqual(isIgnoredElement(regularText), false, 'normal video title text must not be ignored');
+console.log('  ✔ Passed: Chat boxes, contenteditable, and inputs are 100% protected\n');
 
 console.log('🎉 All Unit Tests Passed Successfully!\n');

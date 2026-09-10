@@ -82,7 +82,7 @@ export class MutationManager {
       if (mut.type === 'childList') {
         for (let i = 0; i < mut.addedNodes.length; i++) {
           const node = mut.addedNodes[i];
-          if (node instanceof Element && isIgnoredElement(node)) {
+          if (isIgnoredElement(node)) {
             continue;
           }
           this.pendingNodes.add(node);
@@ -108,10 +108,20 @@ export class MutationManager {
         }
       } else if (mut.type === 'attributes') {
         const el = mut.target as HTMLElement;
-        if (el && !isIgnoredElement(el)) {
-          // If element became visible or expanded (e.g. dropdown open)
-          this.pendingNodes.add(el);
-          hasRelevantMutations = true;
+        if (el) {
+          // Dynamic placeholder rotation on unfocused inputs (e.g. Bilibili search recommendation rotation)
+          if (mut.attributeName === 'placeholder' && (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement)) {
+            if (typeof document === 'undefined' || document.activeElement !== el) {
+              this.pendingNodes.add(el);
+              hasRelevantMutations = true;
+            }
+            continue;
+          }
+          if (!isIgnoredElement(el)) {
+            // If element became visible or expanded (e.g. dropdown open)
+            this.pendingNodes.add(el);
+            hasRelevantMutations = true;
+          }
         }
       }
     }

@@ -38,8 +38,74 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
     "webtrans-overlay",
     "webtrans-hud-root"
   ];
-  function isIgnoredElement(el) {
+  function isEditableOrActiveInput(node, options) {
+    if (!node) return false;
+    const el = node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
+    if (!el || typeof el.getAttribute !== "function") return false;
+    const tag = el.tagName ? el.tagName.toUpperCase() : "";
+    if (tag === "INPUT" || tag === "TEXTAREA" || tag === "RICH-TEXTAREA" || tag === "SELECT") {
+      if (options == null ? void 0 : options.allowInputForAttributes) {
+        if (typeof document !== "undefined" && document.activeElement === el) {
+          return true;
+        }
+        return false;
+      }
+      return true;
+    }
+    if (el.isContentEditable) return true;
+    let curr = el;
+    while (curr && curr !== document.body && curr !== document.documentElement) {
+      if (curr.isContentEditable) return true;
+      const cTag = curr.tagName ? curr.tagName.toUpperCase() : "";
+      if (cTag === "INPUT" || cTag === "TEXTAREA" || cTag === "RICH-TEXTAREA" || cTag === "SELECT") {
+        if ((options == null ? void 0 : options.allowInputForAttributes) && curr === el) {
+          if (typeof document !== "undefined" && document.activeElement === el) {
+            return true;
+          }
+          return false;
+        }
+        return true;
+      }
+      if (typeof curr.hasAttribute === "function") {
+        if (curr.hasAttribute("contenteditable")) {
+          const ce = curr.getAttribute("contenteditable");
+          if (ce !== "false") return true;
+        }
+        const role = curr.getAttribute("role");
+        if (role === "textbox" || role === "searchbox" || role === "combobox") {
+          return true;
+        }
+        if (curr.hasAttribute("data-lexical-editor") || curr.hasAttribute("data-slate-editor")) {
+          return true;
+        }
+        if (curr.getAttribute("translate") === "no") {
+          return true;
+        }
+      }
+      const className = typeof curr.className === "string" ? curr.className : "";
+      if (className) {
+        if (className.includes("ql-editor") || className.includes("ql-container") || className.includes("ProseMirror") || className.includes("DraftEditor-root") || className.includes("public-DraftEditor-content") || className.includes("monaco-editor") || className.includes("cm-editor") || className.includes("CodeMirror") || className.includes("ace_editor") || className.includes("reply-box-textarea") || className.includes("bili-rich-text-input") || className.includes("comment-send-input") || className.includes("notranslate")) {
+          return true;
+        }
+      }
+      curr = curr.parentElement;
+    }
+    if (typeof document !== "undefined" && document.activeElement) {
+      const active = document.activeElement;
+      if (active && active !== document.body && active !== document.documentElement) {
+        if (active === el || el.contains(active) || active.contains(el)) {
+          const aTag = active.tagName ? active.tagName.toUpperCase() : "";
+          if (active.isContentEditable || aTag === "INPUT" || aTag === "TEXTAREA" || aTag === "RICH-TEXTAREA" || active.getAttribute("role") === "textbox") {
+            return true;
+          }
+        }
+      }
+    }
+    return false;
+  }
+  function isIgnoredElement(el, options) {
     if (!el) return false;
+    if (isEditableOrActiveInput(el, options)) return true;
     let current = el;
     while (current) {
       if (current.nodeType === Node.ELEMENT_NODE) {
@@ -63,7 +129,7 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
     }
     return false;
   }
-  function isTranslatableString(str) {
+  function isTranslatableString(str, targetLang, sourceLang) {
     if (!str) return false;
     const trimmed = str.trim();
     if (trimmed.length < 2) return false;
@@ -73,6 +139,18 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
     }
     if (/^(https?:\/\/|[a-z0-9\-_]+\.[a-z]{2,})/i.test(trimmed)) return false;
     if (/^[^\p{L}\p{N}]+$/u.test(trimmed)) return false;
+    if (targetLang && (targetLang === "en" || targetLang.startsWith("en-"))) {
+      if (sourceLang === "zh" || sourceLang === "zh-CN" || sourceLang === "zh-TW") {
+        return /[\p{Script=Han}]/u.test(trimmed);
+      }
+      const hasForeignScript = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}\p{Script=Cyrillic}\p{Script=Arabic}\p{Script=Devanagari}\p{Script=Thai}]/u.test(trimmed);
+      if (!hasForeignScript) {
+        const isPureAsciiEnglish = /^[a-zA-Z0-9\s.,!?'"()\-–—_#%&*+/:;<>@~`=\[\]{}^$|\\]+$/.test(trimmed);
+        if (isPureAsciiEnglish) {
+          return false;
+        }
+      }
+    }
     const hasLettersOrCharacters = /[\p{L}\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u.test(trimmed);
     return hasLettersOrCharacters;
   }
@@ -108,7 +186,7 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
         const parent = textNode.parentElement;
         if (parent && !isIgnoredElement(parent)) {
           const text = ((_a = textNode.nodeValue) == null ? void 0 : _a.trim()) ?? "";
-          if (text && isTranslatableString(text) && this.lastExtractedText.get(textNode) !== text) {
+          if (text && isTranslatableString(text, settings.targetLang, settings.sourceLang) && this.lastExtractedText.get(textNode) !== text) {
             this.lastExtractedText.set(textNode, text);
             targets.push({
               node: textNode,
@@ -135,7 +213,7 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
             }
             if (node.nodeType === Node.TEXT_NODE) {
               const text = (_a2 = node.nodeValue) == null ? void 0 : _a2.trim();
-              if (!text || !isTranslatableString(text)) return NodeFilter.FILTER_REJECT;
+              if (!text || !isTranslatableString(text, settings.targetLang, settings.sourceLang)) return NodeFilter.FILTER_REJECT;
               if (this.lastExtractedText.get(node) === text) return NodeFilter.FILTER_REJECT;
               const parent = node.parentElement;
               if (!parent || isIgnoredElement(parent)) return NodeFilter.FILTER_REJECT;
@@ -171,32 +249,37 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
     // ── Attribute extraction ────────────────────────────────────────────────
     extractAttributes(root, settings, targets) {
       const elementsToInspect = [];
-      if (root instanceof HTMLElement && !isIgnoredElement(root)) {
+      if (root instanceof HTMLElement && !isIgnoredElement(root, { allowInputForAttributes: true })) {
         elementsToInspect.push(root);
         const desc = root.querySelectorAll(
           "input, textarea, [title], [aria-label], [aria-placeholder], [aria-description], img[alt], [data-tooltip], [data-title], [data-tip]"
         );
         desc.forEach((el) => {
-          if (!isIgnoredElement(el)) elementsToInspect.push(el);
+          if (!isIgnoredElement(el, { allowInputForAttributes: true })) {
+            elementsToInspect.push(el);
+          }
         });
       }
       for (const el of elementsToInspect) {
         if (settings.translatePlaceholders) {
-          this.extractAttr(el, "placeholder", targets);
-          this.extractAttr(el, "aria-placeholder", targets);
+          this.extractAttr(el, "placeholder", targets, settings);
+          this.extractAttr(el, "aria-placeholder", targets, settings);
         }
         if (settings.translateTooltips) {
-          this.extractAttr(el, "title", targets);
-          this.extractAttr(el, "aria-label", targets);
-          this.extractAttr(el, "aria-description", targets);
-          this.extractAttr(el, "data-tooltip", targets);
-          this.extractAttr(el, "data-title", targets);
-          this.extractAttr(el, "data-tip", targets);
-          this.extractAlt(el, targets);
+          this.extractAttr(el, "title", targets, settings);
+          this.extractAttr(el, "aria-label", targets, settings);
+          this.extractAttr(el, "aria-description", targets, settings);
+          this.extractAttr(el, "data-tooltip", targets, settings);
+          this.extractAttr(el, "data-title", targets, settings);
+          this.extractAttr(el, "data-tip", targets, settings);
+          this.extractAlt(el, targets, settings);
         }
       }
     }
-    extractAttr(el, attr, targets) {
+    extractAttr(el, attr, targets, settings) {
+      if (typeof document !== "undefined" && document.activeElement === el) {
+        return;
+      }
       let value = null;
       if (attr === "placeholder") {
         value = el.placeholder || el.getAttribute("placeholder") || null;
@@ -204,7 +287,7 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
         value = el.getAttribute(attr);
       }
       const text = value == null ? void 0 : value.trim();
-      if (!text || !isTranslatableString(text)) return;
+      if (!text || !isTranslatableString(text, settings == null ? void 0 : settings.targetLang, settings == null ? void 0 : settings.sourceLang)) return;
       const origAttr = el.getAttribute(`data-webtrans-orig-${attr}`);
       if (origAttr) {
         const lastTranslated = el[`__webtrans_last_${attr}`];
@@ -225,11 +308,11 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
         element: el
       });
     }
-    extractAlt(el, targets) {
+    extractAlt(el, targets, settings) {
       var _a;
       if (el.tagName !== "IMG") return;
       const alt = (_a = el.alt) == null ? void 0 : _a.trim();
-      if (!alt || !isTranslatableString(alt)) return;
+      if (!alt || !isTranslatableString(alt, settings == null ? void 0 : settings.targetLang, settings == null ? void 0 : settings.sourceLang)) return;
       let attrMap = this.lastExtractedAttrValues.get(el);
       if (!attrMap) {
         attrMap = /* @__PURE__ */ new Map();
@@ -310,6 +393,23 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
      */
     applyTranslation(target, rawTranslatedText) {
       if (!rawTranslatedText) return;
+      if (target.type === "text") {
+        if (target.node && isIgnoredElement(target.node)) return;
+        if (target.element && isIgnoredElement(target.element)) return;
+        if (typeof window !== "undefined" && window.getSelection) {
+          try {
+            const sel = window.getSelection();
+            if (sel && sel.rangeCount > 0 && typeof sel.containsNode === "function" && target.node) {
+              if (sel.containsNode(target.node, true)) return;
+            }
+          } catch {
+          }
+        }
+      } else if (target.type === "attribute" && target.element) {
+        if (typeof document !== "undefined" && document.activeElement === target.element) {
+          return;
+        }
+      }
       const cleanTranslation = rawTranslatedText.replace(/^\[(?:EN|ZH|JA|KO|ES|FR|DE|RU|PT|IT|AR|HI|TR|VI|TH|ID):\s*/i, "").replace(/\]$/, "").trim();
       if (!cleanTranslation) return;
       target.translatedText = cleanTranslation;
@@ -617,7 +717,7 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
         if (mut.type === "childList") {
           for (let i = 0; i < mut.addedNodes.length; i++) {
             const node = mut.addedNodes[i];
-            if (node instanceof Element && isIgnoredElement(node)) {
+            if (isIgnoredElement(node)) {
               continue;
             }
             this.pendingNodes.add(node);
@@ -640,9 +740,18 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
           }
         } else if (mut.type === "attributes") {
           const el = mut.target;
-          if (el && !isIgnoredElement(el)) {
-            this.pendingNodes.add(el);
-            hasRelevantMutations = true;
+          if (el) {
+            if (mut.attributeName === "placeholder" && (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement)) {
+              if (typeof document === "undefined" || document.activeElement !== el) {
+                this.pendingNodes.add(el);
+                hasRelevantMutations = true;
+              }
+              continue;
+            }
+            if (!isIgnoredElement(el)) {
+              this.pendingNodes.add(el);
+              hasRelevantMutations = true;
+            }
           }
         }
       }
@@ -2193,6 +2302,7 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
         if (!this.isCurrentSiteEnabled()) {
           this.queue.reset();
           this.overlayManager.clear();
+          this.mutationManager.pause();
           this.floatingHUD.setStatus("Disabled for site");
         }
       });
@@ -2345,11 +2455,12 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
           this.queue.updateSettings(this.settings);
           this.scannerWorker.updateSettings(this.settings);
           this.floatingHUD.updateSettings(this.settings);
-          if (!this.settings.enabled) {
+          const isSiteEnabled = this.isCurrentSiteEnabled();
+          if (!this.settings.enabled || !isSiteEnabled) {
             this.queue.reset();
             this.overlayManager.clear();
             this.mutationManager.pause();
-            this.floatingHUD.setStatus("Paused");
+            this.floatingHUD.setStatus(isSiteEnabled ? "Paused" : "Disabled for site");
           } else {
             this.mutationManager.resume();
             if (!oldEnabled || oldTargetLang !== this.settings.targetLang) {
@@ -2379,11 +2490,12 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
         }).catch(() => {
         });
       }
-      if (!this.settings.enabled) {
+      const isSiteEnabled = this.isCurrentSiteEnabled();
+      if (!this.settings.enabled || !isSiteEnabled) {
         this.queue.reset();
         this.overlayManager.clear();
         this.mutationManager.pause();
-        this.floatingHUD.setStatus("Paused");
+        this.floatingHUD.setStatus(isSiteEnabled ? "Paused" : "Disabled for site");
       } else {
         this.mutationManager.resume();
       }
