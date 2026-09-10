@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "BiliBili English Translator",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Translate BiliBili content instantly in real-time with native in-place translation and local dictionary support",
   "permissions": [
     "storage",
